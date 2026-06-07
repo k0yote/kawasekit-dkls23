@@ -682,12 +682,25 @@ impl<C: DklsCurve> Party<C> {
             mul_senders.insert(*target_party, mul_sender.clone());
         }
 
+        // M3 (self-audit): reject a degenerate refreshed share (mirrors dkg.rs TrivialKeyShare).
+        // A `correction_value` that cancels `poly_point` would yield a trivial key share and
+        // break the threshold guarantee.
+        let refreshed_poly_point = self.poly_point + correction_value;
+        if refreshed_poly_point == <C::Scalar as Field>::ZERO
+            || refreshed_poly_point == <C::Scalar as Field>::ONE
+        {
+            return Err(Abort::recoverable(
+                self.party_index,
+                AbortReason::TrivialKeyShare,
+            ));
+        }
+
         // For key derivation, we just update poly_point.
         let derivation_data = DerivData {
             depth: self.derivation_data.depth,
             child_number: self.derivation_data.child_number,
             parent_fingerprint: self.derivation_data.parent_fingerprint,
-            poly_point: self.poly_point + correction_value, // We update poly_point.
+            poly_point: refreshed_poly_point, // We update poly_point.
             pk: self.pk,
             chain_code: self.derivation_data.chain_code,
         };
@@ -697,7 +710,7 @@ impl<C: DklsCurve> Party<C> {
             party_index: self.party_index,
             session_id: refresh_sid.to_vec(), // We replace the old session id by the new one.
 
-            poly_point: self.poly_point + correction_value, // We update poly_point.
+            poly_point: refreshed_poly_point, // We update poly_point.
             pk: self.pk,
 
             zero_share,
@@ -1144,12 +1157,25 @@ impl<C: DklsCurve> Party<C> {
         // This finishes the initialization for the zero shares protocol.
         let zero_share = ZeroShare::initialize(seeds);
 
+        // M3 (self-audit): reject a degenerate refreshed share (mirrors dkg.rs TrivialKeyShare).
+        // A `correction_value` that cancels `poly_point` would yield a trivial key share and
+        // break the threshold guarantee.
+        let refreshed_poly_point = self.poly_point + correction_value;
+        if refreshed_poly_point == <C::Scalar as Field>::ZERO
+            || refreshed_poly_point == <C::Scalar as Field>::ONE
+        {
+            return Err(Abort::recoverable(
+                self.party_index,
+                AbortReason::TrivialKeyShare,
+            ));
+        }
+
         // For key derivation, we just update poly_point.
         let derivation_data = DerivData {
             depth: self.derivation_data.depth,
             child_number: self.derivation_data.child_number,
             parent_fingerprint: self.derivation_data.parent_fingerprint,
-            poly_point: self.poly_point + correction_value, // We update poly_point.
+            poly_point: refreshed_poly_point, // We update poly_point.
             pk: self.pk,
             chain_code: self.derivation_data.chain_code,
         };
@@ -1160,7 +1186,7 @@ impl<C: DklsCurve> Party<C> {
             party_index: self.party_index,
             session_id: refresh_sid.to_vec(), // We replace the old session id by the new one.
 
-            poly_point: self.poly_point + correction_value, // We update poly_point.
+            poly_point: refreshed_poly_point, // We update poly_point.
             pk: self.pk,
 
             zero_share,
@@ -1367,6 +1393,28 @@ mod tests {
         assert!(
             matches!(abort.reason, AbortReason::MultiplicationVerificationFailed { counterparty, .. } if counterparty == PartyIndex::new(2).unwrap())
         );
+    }
+
+    /// M3: a refresh whose correction cancels the share (refreshed `poly_point` == 0) must be
+    /// rejected as a `TrivialKeyShare`, mirroring the DKG check.
+    #[test]
+    fn test_refresh_complete_phase4_rejects_trivial_key_share() {
+        let mut data = setup_two_party_complete_refresh_phase4_inputs();
+        // A correction that cancels the share ⇒ refreshed poly_point = 0 (a degenerate share).
+        let degenerate = -data.parties[0].poly_point;
+        let result = data.parties[0].refresh_complete_phase4(
+            &data.refresh_sid,
+            &degenerate,
+            &data.proofs_commitments,
+            &data.zero_kept_3to4[0],
+            &data.zero_received_2to4[0],
+            &data.zero_received_3to4[0],
+            &data.mul_kept_3to4[0],
+            &data.mul_received_3to4[0],
+        );
+        let abort = result.expect_err("a trivial refreshed key share must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(matches!(abort.reason, AbortReason::TrivialKeyShare));
     }
 
     /// Tests that complete refresh phase 4 aborts (recoverably) on tampered OT DLog proofs.
