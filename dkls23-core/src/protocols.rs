@@ -95,9 +95,30 @@ impl fmt::Display for PartyIndex {
 /// Contains the values `t` and  `n` from `DKLs23`.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// M2 (self-audit): validate on deserialize — route through `Parameters::new` so a crafted or
+// corrupted serialized value cannot bypass `1 < threshold <= share_count` (e.g. `threshold = 1`
+// would allow single-party signing). Same two-`u8` wire shape (via `ParametersRaw`).
+#[cfg_attr(feature = "serde", serde(try_from = "ParametersRaw"))]
 pub struct Parameters {
     pub threshold: u8,   //t
     pub share_count: u8, //n
+}
+
+/// Deserialization shim for [`Parameters`] (self-audit M2) — identical two-`u8` wire shape; the
+/// `TryFrom` impl below re-imposes the [`Parameters::new`] invariant on every deserialize.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+struct ParametersRaw {
+    threshold: u8,
+    share_count: u8,
+}
+
+#[cfg(feature = "serde")]
+impl TryFrom<ParametersRaw> for Parameters {
+    type Error = InvalidParameters;
+    fn try_from(raw: ParametersRaw) -> Result<Self, Self::Error> {
+        Parameters::new(raw.threshold, raw.share_count)
+    }
 }
 
 impl Parameters {
@@ -571,5 +592,17 @@ mod tests {
         assert!(Parameters::new(1, 3).is_err());
         // threshold > share_count
         assert!(Parameters::new(4, 3).is_err());
+    }
+
+    #[test]
+    fn parameters_serde_rejects_invalid_on_deserialize() {
+        // M2: a crafted / corrupted serialized `Parameters` must NOT bypass `Parameters::new`.
+        // threshold = 1 would allow single-party signing — must be rejected on deserialize.
+        assert!(serde_json::from_str::<Parameters>(r#"{"threshold":1,"share_count":3}"#).is_err());
+        assert!(serde_json::from_str::<Parameters>(r#"{"threshold":0,"share_count":3}"#).is_err());
+        assert!(serde_json::from_str::<Parameters>(r#"{"threshold":4,"share_count":3}"#).is_err());
+        // A valid one still round-trips unchanged.
+        let p: Parameters = serde_json::from_str(r#"{"threshold":2,"share_count":3}"#).unwrap();
+        assert_eq!((p.threshold, p.share_count), (2, 3));
     }
 }
