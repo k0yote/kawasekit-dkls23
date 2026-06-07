@@ -25,6 +25,7 @@ ltc
 Misrouted
 misrouting
 PUSHDATA
+randomizers
 recoverably
 REQUIERMENT
 rerandomization
@@ -46,4 +47,5 @@ xcarbon
 XCoordinate
 Zeroization
 zeroized
-Zeroizing
+zeroizes
+zeroizing
