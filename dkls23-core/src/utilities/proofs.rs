@@ -41,6 +41,7 @@ use rustcrypto_group::prime::PrimeCurveAffine;
 use rustcrypto_group::Curve as GroupCurve;
 use std::collections::HashSet;
 use std::marker::PhantomData;
+use zeroize::Zeroizing;
 
 use crate::curve::DklsCurve;
 use crate::utilities::hashes::{
@@ -226,7 +227,10 @@ impl<C: DklsCurve> DLogProof<C> {
     ) -> Result<DLogProof<C>, ProofSearchExhausted> {
         // We execute Step 1 r times.
         let mut rand_commitments: Vec<C::AffinePoint> = Vec::with_capacity(R as usize);
-        let mut states: Vec<C::Scalar> = Vec::with_capacity(R as usize);
+        // H1 (self-audit): the per-round Schnorr nonces are the secret; from a nonce + the public
+        // (challenge, response) the witness is recoverable. Hold them in `Zeroizing` so they are
+        // wiped when `prove` returns (the proof itself only carries public responses).
+        let mut states: Zeroizing<Vec<C::Scalar>> = Zeroizing::new(Vec::with_capacity(R as usize));
         let mut rng = rng::get_rng();
         for _ in 0..R {
             let (state, rand_commitment) = InteractiveDLogProof::<C>::prove_step1(&mut rng);

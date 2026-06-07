@@ -28,11 +28,12 @@ use crate::utilities::ot::ErrorOT;
 use crate::utilities::proofs::{DLogProof, EncProof};
 use crate::utilities::rng;
 use crate::SECURITY;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // SENDER DATA
 
 /// Sender's data and methods for the base OT protocol.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -42,7 +43,10 @@ use crate::SECURITY;
     ))
 )]
 pub struct OTSender<C: DklsCurve> {
+    // H1 (self-audit): `s` is the base-OT secret — zeroize it on drop. The `proof` is broadcast
+    // (public), so it is skipped.
     pub s: C::Scalar,
+    #[zeroize(skip)]
     pub proof: DLogProof<C>,
 }
 
@@ -52,9 +56,10 @@ pub struct OTSender<C: DklsCurve> {
 pub type Seed = [u8; SECURITY as usize];
 
 /// Receiver's data and methods for the base OT protocol.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OTReceiver {
+    // H1 (self-audit): the receiver's OT seed is secret — zeroize on drop.
     pub seed: Seed,
 }
 
