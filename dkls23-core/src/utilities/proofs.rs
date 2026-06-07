@@ -375,6 +375,16 @@ impl<C: DklsCurve> DLogProof<C> {
             return false;
         }
 
+        // M1 (self-audit): reject the identity point at the proof boundary (defense-in-depth).
+        // A DLogProof for the identity satisfies the Schnorr relation with witness 0; the committed
+        // `point` (and every random commitment) must be a non-identity group element. base OT
+        // (`z = dlog_proof.point`) and DKG step5 (via `decommit_verify` → `verify`) both verify
+        // before using the point, so this single check guards both consumers.
+        let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
+        if proof.point == identity || proof.rand_commitments.iter().any(|rc| *rc == identity) {
+            return false;
+        }
+
         // We transform the random commitments into bytes.
         let vec_rc_as_bytes = proof
             .rand_commitments
@@ -647,6 +657,13 @@ impl<C: DklsCurve> CPProof<C> {
     /// The verifier must know the challenge (in this interactive version, he chooses it).
     #[must_use]
     pub fn verify(&self, rand_commitments: &RandomCommitments<C>, challenge: &C::Scalar) -> bool {
+        // M1 (self-audit): reject identity points in the encryption proof (defense-in-depth) —
+        // a `scalar = 0` would make `point_u`/`point_v` the identity.
+        let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
+        if self.point_u == identity || self.point_v == identity || self.base_h == identity {
+            return false;
+        }
+
         // We compare the values that should agree.
         let point_verify_g =
             ((self.base_g * self.challenge_response) + (self.point_u * challenge)).to_affine();
@@ -981,6 +998,23 @@ mod tests {
         let mut proof = DLogProof::<TestCurve>::prove(&scalar, &session_id).unwrap();
         proof.proofs[0].challenge_response *= Scalar::from(2u32); //Changing the proof
         assert!(!(DLogProof::<TestCurve>::verify(&proof, &session_id)));
+    }
+
+    /// M1: a DLogProof whose committed point — or any random commitment — is the identity must be
+    /// rejected (a proof for the identity satisfies the Schnorr relation with witness 0).
+    #[test]
+    fn test_dlog_proof_rejects_identity_point() {
+        let scalar = <Scalar as Field>::random(&mut rng::get_rng());
+        let session_id = rng::get_rng().random::<[u8; 32]>();
+        let identity = <AffinePoint as PrimeCurveAffine>::identity();
+
+        let mut proof = DLogProof::<TestCurve>::prove(&scalar, &session_id).unwrap();
+        proof.point = identity;
+        assert!(!DLogProof::<TestCurve>::verify(&proof, &session_id));
+
+        let mut proof = DLogProof::<TestCurve>::prove(&scalar, &session_id).unwrap();
+        proof.rand_commitments[0] = identity;
+        assert!(!DLogProof::<TestCurve>::verify(&proof, &session_id));
     }
 
     /// Ensures duplicated random commitments are rejected.
