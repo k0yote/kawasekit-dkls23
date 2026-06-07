@@ -13,8 +13,8 @@
 //! production builds**: it compiles only under `cfg(test)` or the non-default
 //! `trusted-dealer-import` feature. Use it ONLY to import an already-single-custody key (where
 //! the user already holds the key, so no security is lost); genuine non-custodial keygen is the
-//! distributed DKG (`dkg` / `dkg_session`). (Zeroizing the local secret / polynomial is tracked
-//! under self-audit H1.)
+//! distributed DKG (`dkg` / `dkg_session`). The local secret copy and the Shamir polynomial
+//! (whose constant term `[0]` is the secret) are held in `zeroize::Zeroizing` and wiped on return.
 
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
@@ -22,6 +22,7 @@ use std::marker::PhantomData;
 use rustcrypto_ff::Field;
 use rustcrypto_group::prime::PrimeCurveAffine;
 use rustcrypto_group::Curve;
+use zeroize::Zeroizing;
 
 use crate::curve::DklsCurve;
 use crate::utilities::rng;
@@ -57,13 +58,19 @@ pub fn re_key<C: DklsCurve>(
     option_chain_code: Option<ChainCode>,
     address_fn: impl Fn(&C::AffinePoint) -> String,
 ) -> (Vec<Party<C>>, PublicKeyPackage<C>) {
+    // SECURITY (self-audit C1/H1): hold the caller's secret in `Zeroizing` so our local copy is
+    // wiped when this function returns.
+    let secret_key = Zeroizing::new(*secret_key);
+
     // Public key.
     let generator = <C::AffinePoint as PrimeCurveAffine>::generator();
     let pk = (generator * *secret_key).to_affine();
 
     // We will compute "poly_point" for each party with this polynomial
-    // via Shamir's secret sharing.
-    let mut polynomial: Vec<C::Scalar> = Vec::with_capacity(parameters.threshold as usize);
+    // via Shamir's secret sharing. The polynomial is held in `Zeroizing`: its constant term
+    // `[0]` is the secret key, so it must be wiped on drop.
+    let mut polynomial: Zeroizing<Vec<C::Scalar>> =
+        Zeroizing::new(Vec::with_capacity(parameters.threshold as usize));
     polynomial.push(*secret_key);
     for _ in 1..parameters.threshold {
         polynomial.push(C::Scalar::random(&mut rng::get_rng()));
