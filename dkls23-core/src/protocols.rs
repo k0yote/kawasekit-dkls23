@@ -17,6 +17,10 @@ pub mod dkg;
 pub mod dkg_session;
 #[cfg(feature = "serde")]
 pub mod messages;
+/// `re_key` is a TRUSTED-DEALER single-secret keygen (one host briefly holds the whole key —
+/// see its module docs). Gated OFF in default/production builds (self-audit C1); reachable only
+/// under `cfg(test)` or with the non-default `trusted-dealer-import` feature.
+#[cfg(any(test, feature = "trusted-dealer-import"))]
 pub mod re_key;
 pub mod refresh;
 pub mod sign_session;

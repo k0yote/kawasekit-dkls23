@@ -34,3 +34,8 @@ serde_json = "1"
 default = ["serde"]
 serde = ["dep:serde", "dep:serde_bytes", "dep:bincode", "k256/serde"]
 insecure-rng = []
+# C1 (self-audit): `re_key` is a trusted-dealer single-secret keygen — one host briefly holds
+# the WHOLE key. Gated OFF by default so it is unreachable in a production build. Enable ONLY
+# for an explicit "import an already-single-custody key" use case; keys made this way have NO
+# distributed-trust guarantee. Tests reach it implicitly via `cfg(test)`, no feature needed.
+trusted-dealer-import = []

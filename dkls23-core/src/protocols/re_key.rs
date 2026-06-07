@@ -6,6 +6,15 @@
 //! "trusted dealer" that can manipulate all the data from `DKLs23` to the
 //! other parties. Hence, this function is computed locally and doesn't
 //! need any communication.
+//!
+//! **SECURITY (self-audit C1).** Because one host holds the entire secret key at generation, a
+//! key produced here has **no distributed-trust guarantee** — it is custody-in-disguise if used
+//! as if it were a distributed DKG. This module is therefore **gated OFF in default and
+//! production builds**: it compiles only under `cfg(test)` or the non-default
+//! `trusted-dealer-import` feature. Use it ONLY to import an already-single-custody key (where
+//! the user already holds the key, so no security is lost); genuine non-custodial keygen is the
+//! distributed DKG (`dkg` / `dkg_session`). (Zeroizing the local secret / polynomial is tracked
+//! under self-audit H1.)
 
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
