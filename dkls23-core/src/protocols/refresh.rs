@@ -86,6 +86,7 @@
 use std::collections::BTreeMap;
 
 use rustcrypto_ff::Field;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::curve::DklsCurve;
 use crate::utilities::hashes::{tagged_hash, HashOutput};
@@ -121,9 +122,12 @@ pub struct TransmitRefreshPhase2to4 {
 /// Transmit - (Faster) Refresh.
 ///
 /// The message is produced/sent during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransmitRefreshPhase3to4 {
+    // H1 (self-audit): `parties` is public routing metadata (skip). `seed` is the refresh PRF
+    // seed and `salt` its commitment opening — zeroize the local copy on drop.
+    #[zeroize(skip)]
     pub parties: PartiesMessage,
     pub seed: zero_shares::Seed,
     pub salt: Vec<u8>,
@@ -134,9 +138,10 @@ pub struct TransmitRefreshPhase3to4 {
 /// Keep - (Faster) Refresh.
 ///
 /// The message is produced during Phase 2 and used in Phase 3.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeepRefreshPhase2to3 {
+    // H1 (self-audit): refresh PRF seed + its commitment opening — zeroize on drop.
     pub seed: zero_shares::Seed,
     pub salt: Vec<u8>,
 }
@@ -144,9 +149,10 @@ pub struct KeepRefreshPhase2to3 {
 /// Keep - (Faster) Refresh.
 ///
 /// The message is produced during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeepRefreshPhase3to4 {
+    // H1 (self-audit): refresh PRF seed — zeroize on drop.
     pub seed: zero_shares::Seed,
 }
 
@@ -378,7 +384,7 @@ impl<C: DklsCurve> Party<C> {
     /// protocol fails.
     #[allow(clippy::too_many_arguments)]
     pub fn refresh_complete_phase4(
-        &self,
+        &mut self,
         refresh_sid: &[u8],
         correction_value: &C::Scalar,
         proofs_commitments: &[ProofCommitment<C>],
@@ -723,6 +729,11 @@ impl<C: DklsCurve> Party<C> {
             address: self.address.clone(),
         };
 
+        // M3 (self-audit): refresh produced a replacement key share — wipe the OLD secret state
+        // now so a caller holding both the old and new `Party` during the round does not retain
+        // stale key material. Zeroize only on success: on `Err` the refresh did not complete and
+        // `self` is still the live, valid share.
+        self.zeroize();
         Ok(party)
     }
 
@@ -860,7 +871,7 @@ impl<C: DklsCurve> Party<C> {
     /// Will panic if the indices of the parties are different
     /// from the ones used in DKG.
     pub fn refresh_phase4(
-        &self,
+        &mut self,
         refresh_sid: &[u8],
         correction_value: &C::Scalar,
         proofs_commitments: &[ProofCommitment<C>],
@@ -1199,6 +1210,11 @@ impl<C: DklsCurve> Party<C> {
             address: self.address.clone(),
         };
 
+        // M3 (self-audit): refresh produced a replacement key share — wipe the OLD secret state
+        // now so a caller holding both the old and new `Party` during the round does not retain
+        // stale key material. Zeroize only on success: on `Err` the refresh did not complete and
+        // `self` is still the live, valid share.
+        self.zeroize();
         Ok(party)
     }
 }
@@ -1497,9 +1513,11 @@ mod tests {
         // We use the re_key function to quickly sample the parties.
         let session_id = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
         let secret_key = k256::Scalar::random(&mut rng::get_rng());
-        let (parties, _) = re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
-            String::new()
-        });
+        // `mut` because refresh phase-4 now takes `&mut self` (zeroizes the old share, self-audit M3).
+        let (mut parties, _) =
+            re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
+                String::new()
+            });
 
         // REFRESH (it follows test_dkg_initialization closely)
 
@@ -1802,9 +1820,11 @@ mod tests {
         // We use the re_key function to quickly sample the parties.
         let session_id = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
         let secret_key = k256::Scalar::random(&mut rng::get_rng());
-        let (parties, _) = re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
-            String::new()
-        });
+        // `mut` because refresh phase-4 now takes `&mut self` (zeroizes the old share, self-audit M3).
+        let (mut parties, _) =
+            re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
+                String::new()
+            });
 
         // REFRESH (faster version)
 

@@ -58,6 +58,7 @@ use rustcrypto_group::prime::PrimeCurveAffine;
 use rustcrypto_group::Curve as GroupCurve;
 
 use rand::RngExt;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::curve::DklsCurve;
 use crate::protocols::derivation::{ChainCode, DerivData, CHAIN_CODE_LEN};
@@ -117,9 +118,12 @@ pub struct TransmitInitZeroSharePhase2to4 {
 /// Transmit - Initialization of zero shares protocol.
 ///
 /// The message is produced/sent during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransmitInitZeroSharePhase3to4 {
+    // H1 (self-audit): `parties` is public routing metadata (skip). `seed` is the zero-share PRF
+    // seed and `salt` its commitment opening — zeroize the local copy on drop.
+    #[zeroize(skip)]
     pub parties: PartiesMessage,
     pub seed: zero_shares::Seed,
     pub salt: Vec<u8>,
@@ -128,9 +132,10 @@ pub struct TransmitInitZeroSharePhase3to4 {
 /// Keep - Initialization of zero shares protocol.
 ///
 /// The message is produced during Phase 2 and used in Phase 3.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeepInitZeroSharePhase2to3 {
+    // H1 (self-audit): zero-share PRF seed + its commitment opening — zeroize on drop.
     pub seed: zero_shares::Seed,
     pub salt: Vec<u8>,
 }
@@ -138,9 +143,10 @@ pub struct KeepInitZeroSharePhase2to3 {
 /// Keep - Initialization of zero shares protocol.
 ///
 /// The message is produced during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeepInitZeroSharePhase3to4 {
+    // H1 (self-audit): zero-share PRF seed — zeroize on drop.
     pub seed: zero_shares::Seed,
 }
 
@@ -149,7 +155,7 @@ pub struct KeepInitZeroSharePhase3to4 {
 /// Transmit - Initialization of multiplication protocol.
 ///
 /// The message is produced/sent during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -159,11 +165,16 @@ pub struct KeepInitZeroSharePhase3to4 {
     ))
 )]
 pub struct TransmitInitMulPhase3to4<C: DklsCurve> {
+    // H1 (self-audit): `parties` (routing) and the `dlog_proof`/`enc_proofs` (broadcast ZK proofs)
+    // are public — skip. `nonce` and the base-OT `seed` are secret — zeroize on drop.
+    #[zeroize(skip)]
     pub parties: PartiesMessage,
 
+    #[zeroize(skip)]
     pub dlog_proof: DLogProof<C>,
     pub nonce: C::Scalar,
 
+    #[zeroize(skip)]
     pub enc_proofs: Vec<EncProof<C>>,
     pub seed: ot::base::Seed,
 }
@@ -171,7 +182,7 @@ pub struct TransmitInitMulPhase3to4<C: DklsCurve> {
 /// Keep - Initialization of multiplication protocol.
 ///
 /// The message is produced during Phase 3 and used in Phase 4.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -181,6 +192,9 @@ pub struct TransmitInitMulPhase3to4<C: DklsCurve> {
     ))
 )]
 pub struct KeepInitMulPhase3to4<C: DklsCurve> {
+    // H1 (self-audit): every field is secret COTe bootstrap state — the base-OT sender secret
+    // (`ot_sender.s`), the receiver seed (`ot_receiver.seed`), the `nonce`, the OT `correlation`
+    // bits and the `vec_r` randomizers. Zeroize on drop (OTSender/OTReceiver already do).
     pub ot_sender: ot::base::OTSender<C>,
     pub nonce: C::Scalar,
 

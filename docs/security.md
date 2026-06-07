@@ -41,12 +41,24 @@ This prevents cross-session and cross-derivation transcript reuse.
 - `#![forbid(unsafe_code)]` is enforced crate-wide.
 - All types holding secret material implement `Zeroize` and `ZeroizeOnDrop`:
   - `OTESender`, `OTEReceiver` (OT correlations)
+  - `OTSender`, `OTReceiver` (base-OT sender secret `s` / receiver seed)
   - `MulSender`, `MulReceiver`, `MulDataToKeepReceiver` (multiplication state)
   - `ZeroShare`, `SeedPair` (shared seeds)
   - `DerivData` (derived key share and chain code)
   - `KeepPhase1to2`, `KeepPhase2to3` (signing intermediates)
   - `UniqueKeep1to2`, `UniqueKeep2to3` (signing intermediates)
+  - DKG init carriers: `KeepInitMulPhase3to4`, `TransmitInitMulPhase3to4`
+    (base-OT/COTe bootstrap state), `KeepInitZeroSharePhase2to3`,
+    `KeepInitZeroSharePhase3to4`, `TransmitInitZeroSharePhase3to4` (zero-share PRF seeds)
+  - Refresh carriers: `KeepRefreshPhase2to3`, `KeepRefreshPhase3to4`,
+    `TransmitRefreshPhase3to4` (refresh PRF seeds)
   - `Party` (manual `Zeroize` + `Drop` implementation)
+- The non-interactive ZK proof objects (`DLogProof`, `InteractiveDLogProof`,
+  `CPProof`, `EncProof`) and the public routing field `parties: PartiesMessage`
+  carried by the init carriers above are **broadcast values** — they hold no secret
+  material and are `#[zeroize(skip)]`ped where they appear inside a zeroizing struct.
+  The witness-bearing secret is the per-round Schnorr **nonce**, which never enters a
+  proof object: it is held in `Zeroizing` inside `DLogProof::prove` and wiped on return.
 
 ## Side-Channel Resistance
 
