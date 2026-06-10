@@ -1,0 +1,12 @@
+# cargo-audit configuration for the kawasekit-dkls23 fork (read by `cargo audit`).
+#
+# These are UNMAINTAINED-only advisories with NO active vulnerability, inherited from the
+# DKLs23 + k256-0.14-rc dependency tree. ACCEPTED for the current testnet / no-value scope and
+# tracked for the mandatory third-party crypto audit. See FORK.md.
+#
+# (The yanked `crypto-bigint 0.7.1` is a transitive pin of the frozen k256 0.14-rc line; cargo
+#  audit reports it as a non-failing warning. It is part of the version-scoped audit surface.)
+[advisories]
+ignore = [
+    "RUSTSEC-2025-0141", # bincode 1.x unmaintained (transitive serde codec). No active vuln.
+]

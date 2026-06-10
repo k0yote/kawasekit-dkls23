@@ -1,0 +1,51 @@
+name: Feature guards
+
+# A4 (kawasekit M6-3a hardening): assert the dangerous feature combinations CANNOT be built where they
+# would be a security hole, and that the safe defaults still build. Belt-and-suspenders over the
+# `compile_error!` guards in dkls23-core/src/lib.rs — a future refactor that weakens a guard fails here.
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '.github/workflows/feature-guards.yml'
+  pull_request:
+    branches: [main, dev]
+    types: [opened, reopened, synchronize]
+
+jobs:
+  guards:
+    name: Dangerous features fail to build; defaults succeed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      # --- must SUCCEED ---
+      - name: default (native) builds
+        run: cargo build -p dkls23-core
+      - name: default (wasm32) builds
+        run: cargo build -p dkls23-core --target wasm32-unknown-unknown
+      - name: native trusted-dealer-import (documented import use) builds
+        run: cargo build -p dkls23-core --features trusted-dealer-import
+
+      # --- must FAIL (a zero exit here is a guard regression) ---
+      - name: insecure-rng must NOT build outside test
+        run: |
+          if cargo build -p dkls23-core --features insecure-rng 2>/dev/null; then
+            echo "::error::insecure-rng built in a non-test build — the compile_error guard regressed"
+            exit 1
+          fi
+          echo "OK: insecure-rng correctly rejected outside test"
+      - name: trusted-dealer-import must NOT build on wasm32
+        run: |
+          if cargo build -p dkls23-core --target wasm32-unknown-unknown --features trusted-dealer-import 2>/dev/null; then
+            echo "::error::trusted-dealer-import built on wasm32 — the compile_error guard regressed"
+            exit 1
+          fi
+          echo "OK: trusted-dealer-import correctly rejected on wasm32"
