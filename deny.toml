@@ -1,0 +1,34 @@
+# cargo-deny configuration for the kawasekit-dkls23 fork.
+# Runs in CI (supply-chain.yml): RustSec advisories, license policy, dependency sources, bans.
+
+[advisories]
+# UNMAINTAINED-only, no active vuln — accepted for testnet (see FORK.md / audit.toml).
+ignore = ["RUSTSEC-2025-0141"]
+# crypto-bigint 0.7.1 is yanked but is the version the frozen k256 0.14-rc tree resolves to
+# (part of the version-scoped audit surface, FORK.md). Surface it, don't fail CI on it.
+yanked = "warn"
+
+[licenses]
+# DKLs23 + the k256 / elliptic-curve 0.14-rc tree are permissive (Apache-2.0 / MIT / BSD / etc.).
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

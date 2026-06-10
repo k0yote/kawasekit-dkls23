@@ -1,0 +1,47 @@
+name: Supply chain
+
+# A3 (kawasekit M6-3a hardening): the fork is consumed by the mpc-2p co-signer at a pinned SHA, so a
+# newly-published advisory against the frozen k256 0.14-rc dependency tree must surface here. Runs on
+# dependency changes, on PRs, and weekly (a new advisory needs no code change to become relevant).
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+      - 'audit.toml'
+      - '.github/workflows/supply-chain.yml'
+  pull_request:
+    branches: [main, dev]
+    types: [opened, reopened, synchronize]
+  schedule:
+    - cron: '0 6 * * 1' # Monday 06:00 UTC
+
+jobs:
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: cargo audit
+        run: cargo audit # audit.toml records the accepted unmaintained advisories
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: cargo deny check
+        run: cargo deny check advisories bans licenses sources

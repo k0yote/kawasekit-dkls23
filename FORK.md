@@ -1,0 +1,120 @@
+# FORK.md — kawasekit-dkls23
+
+`kawasekit-dkls23` is kawasekit's maintained fork of **[0xCarbon/DKLs23](https://github.com/0xCarbon/DKLs23)**,
+the DKLs23 threshold-ECDSA implementation that backs the `kawasekit-mpc-2p` 2-of-2 co-signer.
+
+It exists for one reason: the **running** mpc-2p backend must carry the pre-paid-audit **self-audit hardening**
+(secret zeroization, identity-point rejection, `Parameters` validation, gated trusted-dealer `re_key`), which the
+**published** `dkls23-{core,secp256k1} 0.5.1` on crates.io does **not** have. The backend therefore depends on
+this fork by an exact git SHA, not on the crates.io release.
+
+## Pinned upstream base
+
+|  |  |
+|---|---|
+| Upstream | `0xCarbon/DKLs23` |
+| Base version | `dkls23-core` / `dkls23-secp256k1` **v0.5.1** (the crates.io release line) |
+| Base commit | `c9c407e` — "Merge pull request #90 from 0xCarbon/dev" (2026-04-09) |
+| Fork branch | `dev` |
+| Fork HEAD (pinned by the backend) | `4ec716bc479b351e5822d7f21f0e6d0d86d96173` |
+
+The backend pins this exact SHA in **two** places — they MUST match, otherwise two copies of
+`dkls23-secp256k1` (crates.io vs git) would make the `Abort` types incompatible:
+
+- `kawasekit-mpc-2p/crypto-core/Cargo.toml` → `dkls23-secp256k1 = { git = "…/kawasekit-dkls23.git", rev = "4ec716bc…" }`
+- `kawasekit-mpc-2p/Cargo.toml` (dev-dep) → same git + rev.
+
+> The 0.5.1 line the fork is cut from already carries upstream's own `rand 0.10.1` maintenance bump
+> (`6fe0259`, merge `a0ac4d0`); those are upstream commits, not part of the kawasekit delta.
+
+## The delta (what this fork changes vs the published 0.5.1)
+
+Nine commits, `4398d25..4ec716b` on `dev`, plus the A4 build-safety guards below. All are **defensive
+hardening from the crate self-audit** (`docs/security.md` and the mpc-2p `docs/SELF-AUDIT.md`); none change the
+wire format or the protocol math, so the fork is a **drop-in source swap** for the published 0.5.1 (same crate
+name + version `0.5.1`).
+
+| File | Self-audit finding | One-line rationale |
+|---|---|---|
+| `dkls23-core/src/utilities/proofs.rs` | **M1** + **M2** | Reject identity points at the proof-verifier boundary; validate `Parameters` on deserialize. |
+| `dkls23-core/src/protocols.rs` | M1/M2 support | Shared validation surface used by the boundary checks above. |
+| `dkls23-core/src/utilities/ot/base.rs` | **H1 (part 1)** | Zeroize the base-OT secret/seed + Schnorr nonces after use. |
+| `dkls23-core/src/protocols/dkg.rs` | **H1 (part 2)** | Zeroize key-init carriers in DKG. |
+| `dkls23-core/src/protocols/refresh.rs` | **H1 / M3** | Zeroize the old `Party` on refresh; reject a trivially-refreshed (unchanged) key share. |
+| `dkls23-core/src/protocols/re_key.rs` | **C1** | Gate single-custody trusted-dealer `re_key` behind a non-default feature; zeroize its trusted-dealer locals. |
+| `dkls23-core/Cargo.toml` | C1 | Declare the `trusted-dealer-import` (gated `re_key`) feature, default-off. |
+| `dkls23-core/src/lib.rs` | **A4** (kawasekit M6-3a) | `compile_error!` guards: `insecure-rng` forbidden outside `cfg(test)`; `trusted-dealer-import` forbidden on `wasm32`. |
+| `docs/security.md` | — | Records the self-audit hardening. |
+| `.github/…` | — | CI hygiene: spelling dictionary; drop the deprecated upstream audit/unmaintained workflows (replaced by `supply-chain.yml` + `feature-guards.yml`). |
+
+### A4 — locked-out feature combinations
+
+`dkls23-core/src/lib.rs` carries `compile_error!` guards (belt-and-suspenders over the existing `#[cfg(...)]`
+gating), and `.github/workflows/feature-guards.yml` asserts them in CI:
+
+| Build | Result | Why |
+|---|---|---|
+| `--features insecure-rng` (non-test) | **must fail** | `insecure-rng` weakens the CSPRNG; it is test-only. |
+| `--target wasm32 --features trusted-dealer-import` | **must fail** | The wasm32 **agent** is a distributed 2-of-2 party; single-custody `re_key` import would be a custody violation. |
+| `--features trusted-dealer-import` (native) | **must succeed** | A deliberate **native** import flow is a documented, legitimate use (`re_key.rs`). |
+| default (native + wasm32) | **must succeed** | The normal builds. |
+
+> **Design note (A4 scoping):** the `trusted-dealer-import` guard is scoped to `wasm32`, not "outside test",
+> because the fork documents a legitimate native import use. The custody risk is specifically the **agent**
+> (the wasm32 party), so the guard targets that build and leaves native import available. `insecure-rng` is
+> truly test-only, so its guard is "outside `cfg(test)`".
+
+> **Hard rule — `trusted-dealer-import` is provisioning-only, never a service capability.** The native
+> `trusted-dealer-import` (single-custody `re_key`) exists for a one-time **provisioning / import** path
+> ONLY. The production owner-backend **service** build MUST NEVER enable it — the running backend must never
+> reconstitute a full key. This is the non-custodial invariant: import is a one-time provisioning step, not a
+> standing service capability. The `wasm32` guard above stops the agent; this rule binds the **native service**
+> build by policy (the guard can't distinguish a service binary from a provisioning tool on native).
+> **TODO (when the import flow is implemented):** give it its own feature-guarded binary, separate from the
+> backend service binary, so the service binary can never link the import code path. This rule also belongs in
+> the deploy runbook (Track D — note it here, do not build Track D now).
+
+## Frozen release-candidate crypto versions
+
+DKLs23 is built on the `k256` / `elliptic-curve` **0.14 release-candidate** line. There is **no stable `k256`
+0.14** — stable `k256` is `0.13`, a different API the DKLs23 code is not written against. So the crypto is, and
+remains until upstream ships a stable 0.14, **version-scoped to exact release candidates**:
+
+- The backend pins `k256 = "=0.14.0-rc.9"` and `elliptic-curve = "=0.14.0-rc.32"` (exact `=` pins in
+  `kawasekit-mpc-2p/crypto-core/Cargo.toml`); the committed `Cargo.lock` is the authoritative freeze.
+- **One unified resolution for what ships.** The fork is consumed *as the backend's git dependency*. In that
+  build the backend's `=` pins drive a single resolution across the whole tree — including the fork's DKLs
+  crates — so the running co-signer has exactly **one** `k256 0.14` (`rc.9`) and **one** `elliptic-curve 0.14`
+  (`rc.32`). That backend `Cargo.lock` is the audit target. The fork's *standalone* `Cargo.lock` (used only by
+  the fork's own CI, in isolation) floats on the same rc line and is **not** what ships.
+- **The freeze is load-bearing — the rc line is actively churning.** A bare `cargo update` on a fresh tree now
+  pulls `elliptic-curve 0.14.0-rc.33` (published after the freeze; an exact `rc.32` resolve already fails a
+  `rustcrypto-ff` constraint). The `=` pins + the committed lock are the only thing holding the audited versions.
+- **Decision — which lock is authoritative: the BACKEND's.** We do **not** commit-freeze the fork's standalone
+  `Cargo.lock`; the fork's own CI is allowed to float to a newer rc (e.g. `rc.33`). The single authoritative
+  frozen set is the **backend's committed `Cargo.lock`** (`k256 0.14.0-rc.9` / `elliptic-curve 0.14.0-rc.32`) —
+  that is what ships and what the T2 audit targets. The fork CI's role is supply-chain signal
+  (advisories/licenses/sources) across the rc line, **not** to define the shipped crypto versions. If a fork-CI
+  rc differs from the backend's frozen set, the **backend's** set wins by definition.
+- **Audit scope:** the mandatory third-party crypto audit is scoped to *the backend's frozen rc versions* +
+  this fork delta. Bumping any backend rc pin re-opens that scope. Do **not** `cargo update` the crypto crates
+  in the backend.
+
+## Upstream-advisory / rebase process
+
+1. Watch `0xCarbon/DKLs23` (releases + `dev`) and the [RustSec advisory-db] for anything touching the dep
+   tree. `cargo audit` and `cargo deny check` are wired into `supply-chain.yml` (incl. a weekly schedule) to
+   catch newly-published advisories against the frozen rc tree.
+2. To take an upstream fix: rebase the kawasekit delta onto the new upstream tag on a topic branch; resolve
+   conflicts only in the touched files; keep the delta minimal (no new behavior).
+3. Re-run the full fork CI (`backend-ci`, `clippy`, `fmt-check`, **`supply-chain`**, **`feature-guards`**).
+4. Bump the pinned `rev` in **both** backend `Cargo.toml`s + refresh the backend `Cargo.lock`; re-run the
+   backend 4-point + the M6-3a gates + the e2e; update this file's HEAD + base rows.
+5. Land as a reviewed PR — the backend pin bump and the fork HEAD move in the **same** cycle.
+
+## Status
+
+UNAUDITED. The fork carries the **self-audit** hardening only; the mandatory **third-party** crypto audit is a
+standing pre-mainnet gate (it does **not** clear by self-audit). Testnet / no-value only.
+
+[RustSec advisory-db]: https://github.com/RustSec/advisory-db
