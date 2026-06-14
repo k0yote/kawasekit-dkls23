@@ -46,7 +46,7 @@ use crate::protocols::{Abort, AbortReason, PartiesMessage, Party, PartyIndex};
 
 use crate::utilities::commits::{commit_point, verify_commitment_point};
 use crate::utilities::hashes::HashOutput;
-use crate::utilities::multiplication::{MulDataToKeepReceiver, MulDataToReceiver};
+use crate::utilities::multiplication::{MulDataToKeepReceiver, MulDataToReceiver, MulErrorKind};
 use crate::utilities::ot::extension::OTEDataToSender;
 use crate::utilities::rng;
 
@@ -560,14 +560,26 @@ impl<C: DklsCurve> Party<C> {
             let mul_transmit: MulDataToReceiver<C>;
             match mul_result {
                 Err(error) => {
-                    return Err(Abort::ban(
-                        self.party_index,
-                        counterparty,
-                        AbortReason::MultiplicationVerificationFailed {
+                    // H1 (self-audit): ban ONLY on the leak-bearing consistency-check
+                    // failure (reused OT state leaked); a malformed / ill-dimensioned
+                    // message is recoverable. See docs/audit-findings.md finding H1.
+                    return Err(match error.kind {
+                        MulErrorKind::ConsistencyFailure => Abort::ban(
+                            self.party_index,
                             counterparty,
-                            detail: error.description.clone(),
-                        },
-                    ));
+                            AbortReason::MultiplicationVerificationFailed {
+                                counterparty,
+                                detail: error.description.clone(),
+                            },
+                        ),
+                        MulErrorKind::MalformedMessage => Abort::recoverable(
+                            self.party_index,
+                            AbortReason::MultiplicationVerificationFailed {
+                                counterparty,
+                                detail: error.description.clone(),
+                            },
+                        ),
+                    });
                 }
                 Ok((c_values, data_to_receiver)) => {
                     c_u = c_values[0];
@@ -756,14 +768,26 @@ impl<C: DklsCurve> Party<C> {
             let d_v: C::Scalar;
             match mul_result {
                 Err(error) => {
-                    return Err(Abort::ban(
-                        self.party_index,
-                        counterparty,
-                        AbortReason::MultiplicationVerificationFailed {
+                    // H1 (self-audit): ban ONLY on the leak-bearing consistency-check
+                    // failure (reused OT state leaked); a malformed / ill-dimensioned
+                    // message is recoverable. See docs/audit-findings.md finding H1.
+                    return Err(match error.kind {
+                        MulErrorKind::ConsistencyFailure => Abort::ban(
+                            self.party_index,
                             counterparty,
-                            detail: error.description.clone(),
-                        },
-                    ));
+                            AbortReason::MultiplicationVerificationFailed {
+                                counterparty,
+                                detail: error.description.clone(),
+                            },
+                        ),
+                        MulErrorKind::MalformedMessage => Abort::recoverable(
+                            self.party_index,
+                            AbortReason::MultiplicationVerificationFailed {
+                                counterparty,
+                                detail: error.description.clone(),
+                            },
+                        ),
+                    });
                 }
                 Ok(d_values) => {
                     d_u = d_values[0];
@@ -2177,6 +2201,121 @@ mod tests {
             abort.reason,
             AbortReason::GammaUInconsistency { .. }
         ));
+    }
+
+    /// H1 (self-audit): a benign malformed multiplication message (wrong dimensions)
+    /// must abort RECOVERABLY. Only a leak-bearing verify_r / COTe consistency-check
+    /// failure warrants a permanent ban of the counterparty (a permanent 2-of-2 ban on
+    /// a transient/malformed message is a fund-availability event; and conflating the two
+    /// forces integrators into an unsafe ban trade-off).
+    #[test]
+    fn test_sign_phase3_malformed_mul_message_is_recoverable() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+        let (unique_kept_2to3, kept_2to3, received_2to3) = run_two_party_phase2(
+            &parties,
+            &all_data,
+            &unique_kept_1to2,
+            &kept_1to2,
+            &received_1to2,
+        );
+
+        let mut tampered = received_2to3
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        // Truncate verify_u to the wrong length: MulReceiver::run_phase2 fails its
+        // dimension guard (a malformed message), NOT the verify_r consistency check.
+        tampered[0].mul_transmit.verify_u.clear();
+
+        let result = parties[0].sign_phase3(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("malformed mul message should be rejected");
+        assert_eq!(
+            abort.kind,
+            AbortKind::Recoverable,
+            "a malformed/dimension mul error must be recoverable, not a permanent ban"
+        );
+    }
+
+    /// H1 (self-audit): a malformed OTE-layer message (wrong tau dimensions) — surfaced
+    /// through the multiplication's wrap of the OT-extension error — must ALSO be
+    /// recoverable, not a ban. verify_u/gamma_sender stay valid so the mul-layer dimension
+    /// guard passes and we reach the OTE-layer dimension guard.
+    #[test]
+    fn test_sign_phase3_malformed_ote_message_is_recoverable() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+        let (unique_kept_2to3, kept_2to3, received_2to3) = run_two_party_phase2(
+            &parties,
+            &all_data,
+            &unique_kept_1to2,
+            &kept_1to2,
+            &received_1to2,
+        );
+
+        let mut tampered = received_2to3
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        // Truncate the tau vector: OTEReceiver::run_phase2 fails its tau-dimension guard
+        // (a malformed OTE message), surfaced as an ErrorMul via the OTE->Mul wrap.
+        tampered[0].mul_transmit.vector_of_tau.clear();
+
+        let result = parties[0].sign_phase3(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("malformed OTE message should be rejected");
+        assert_eq!(
+            abort.kind,
+            AbortKind::Recoverable,
+            "a malformed OTE/dimension error must be recoverable, not a permanent ban"
+        );
+    }
+
+    /// H1 (security invariant / regression): the leak-bearing `verify_r` consistency-check
+    /// failure MUST still BAN the counterparty — reused OT state has leaked. This pins the
+    /// other side of the taxonomy so the malformed→recoverable change can never silently
+    /// downgrade a genuine consistency failure to recoverable.
+    #[test]
+    fn test_sign_phase3_bans_on_tampered_verify_r() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+        let (unique_kept_2to3, kept_2to3, received_2to3) = run_two_party_phase2(
+            &parties,
+            &all_data,
+            &unique_kept_1to2,
+            &kept_1to2,
+            &received_1to2,
+        );
+
+        let mut tampered = received_2to3
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        // Flip a byte of verify_r: the receiver's reconstructed r no longer matches, so
+        // MulReceiver::run_phase2's consistency check fails — a leak-bearing failure.
+        tampered[0].mul_transmit.verify_r[0] ^= 1;
+
+        let result = parties[0].sign_phase3(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("tampered verify_r should be rejected");
+        assert_eq!(
+            abort.kind,
+            AbortKind::BanCounterparty(PartyIndex::new(2).unwrap()),
+            "a leak-bearing verify_r consistency failure must ban the counterparty"
+        );
     }
 
     /// Tests if phase 4 rejects tampered broadcast values that invalidate signature assembly.

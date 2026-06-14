@@ -32,6 +32,7 @@ Fordefi
 getrandom
 hrp
 idx
+integrators
 kawasekit
 keypair
 kryptology
