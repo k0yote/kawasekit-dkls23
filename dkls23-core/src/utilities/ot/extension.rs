@@ -909,11 +909,15 @@ pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
     // Algorithm 2.34 (page 49)
     for k in 0..W {
         for j in 0..T {
-            //If the k-th bit of a[j] is 1, we add b to c (with the correct shift).
-            if (a[j as usize] >> k) % 2 == 1 {
-                for i in 0..=T {
-                    c[(j + i) as usize] ^= b[i as usize];
-                }
+            // Constant-time (M1, self-audit): derive a 0/all-ones mask from the k-th bit of
+            // `a[j]` and XOR `b & mask` unconditionally — no secret-dependent branch. `a` is
+            // derived from the secret OT correlation, so the old `if bit == 1` branch leaked it
+            // via timing. Best-effort; the measured side-channel verdict is the paid audit
+            // (see docs/audit-findings.md, finding M1).
+            let bit = (a[j as usize] >> k) & 1;
+            let mask = 0u64.wrapping_sub(bit);
+            for i in 0..=T {
+                c[(j + i) as usize] ^= b[i as usize] & mask;
             }
         }
 
@@ -1053,6 +1057,38 @@ mod tests {
 
             assert_eq!(initial, result);
         }
+    }
+
+    /// M1 guard: multiplying by the field identity (`1`) is a no-op. Deterministically pins
+    /// `field_mul` correctness across the constant-time refactor — a wrong mask polarity would
+    /// make `x * 1 != x`.
+    #[test]
+    fn test_field_mul_identity() {
+        const N: usize = (OT_SECURITY / 8) as usize; // 26 bytes
+        let mut one = [0u8; N];
+        one[0] = 1; // little-endian: byte 0, bit 0 is the constant term
+
+        // A deterministic, non-trivial 208-bit element.
+        let mut x = [0u8; N];
+        for (i, byte) in x.iter_mut().enumerate() {
+            *byte = (i as u8).wrapping_mul(37).wrapping_add(1);
+        }
+
+        assert_eq!(
+            field_mul(&x, &one).expect("mul ok"),
+            x,
+            "x * 1 must equal x"
+        );
+        assert_eq!(
+            field_mul(&one, &x).expect("mul ok"),
+            x,
+            "1 * x must equal x"
+        );
+        assert_eq!(
+            field_mul(&one, &one).expect("mul ok"),
+            one,
+            "1 * 1 must equal 1"
+        );
     }
 
     /// Tests that field multiplication rejects malformed input lengths.
