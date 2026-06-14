@@ -26,7 +26,7 @@ use crate::utilities::ot::base::{OTReceiver, OTSender, Seed};
 use crate::utilities::ot::extension::{
     OTEDataToSender, OTEReceiver, OTESender, PRGOutput, BATCH_SIZE,
 };
-use crate::utilities::ot::ErrorOT;
+use crate::utilities::ot::{ErrorOT, OtErrorKind};
 use rand::RngExt;
 
 /// Constant `L` from Functionality 3.5 in `DKLs23` used for signing in Protocol 3.6.
@@ -117,18 +117,58 @@ pub struct MulDataToKeepReceiver<C: DklsCurve> {
     _curve: PhantomData<C>,
 }
 
+/// Classifies a multiplication error so the caller can decide ban vs. recoverable.
+///
+/// Only a leak-bearing consistency-check failure (the `verify_r` / COTe check over the
+/// reused OT correlations) warrants permanently banning the counterparty; a malformed or
+/// ill-dimensioned message is recoverable. See `docs/audit-findings.md` finding H1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MulErrorKind {
+    /// A leak-bearing consistency-check failure. The counterparty MUST be permanently banned.
+    ConsistencyFailure,
+    /// A malformed / ill-dimensioned message or other non-leak-bearing fault. Recoverable.
+    MalformedMessage,
+}
+
 /// Represents an error during the multiplication protocol.
 #[derive(Debug)]
 pub struct ErrorMul {
     pub description: String,
+    pub kind: MulErrorKind,
 }
 
 impl ErrorMul {
-    /// Creates an instance of `ErrorMul`.
+    /// Creates a consistency-failure (ban-class) error. This is the conservative default,
+    /// so an unclassified error still bans rather than silently downgrading to recoverable.
     #[must_use]
     pub fn new(description: &str) -> ErrorMul {
         ErrorMul {
             description: String::from(description),
+            kind: MulErrorKind::ConsistencyFailure,
+        }
+    }
+
+    /// Creates a malformed-message (recoverable-class) error.
+    #[must_use]
+    pub fn malformed(description: &str) -> ErrorMul {
+        ErrorMul {
+            description: String::from(description),
+            kind: MulErrorKind::MalformedMessage,
+        }
+    }
+
+    /// Wraps an OT-extension error, **propagating** its ban-vs-recoverable classification
+    /// so a leak-bearing COTe consistency failure still bans while a malformed OTE message
+    /// stays recoverable (H1).
+    #[must_use]
+    pub fn from_ot(error: &ErrorOT) -> ErrorMul {
+        let kind = match error.kind {
+            OtErrorKind::ConsistencyFailure => MulErrorKind::ConsistencyFailure,
+            OtErrorKind::MalformedMessage => MulErrorKind::MalformedMessage,
+        };
+        ErrorMul {
+            description: format!("OTE error during multiplication: {:?}", error.description),
+            kind,
         }
     }
 }
@@ -282,10 +322,7 @@ impl<C: DklsCurve> MulSender<C> {
                 (ot_outputs, vector_of_tau) = (out, tau);
             }
             Err(error) => {
-                return Err(ErrorMul::new(&format!(
-                    "OTE error during multiplication: {:?}",
-                    error.description
-                )));
+                return Err(ErrorMul::from_ot(&error));
             }
         }
 
@@ -507,10 +544,7 @@ impl<C: DklsCurve> MulReceiver<C> {
             match self.ote_receiver.run_phase1(&ote_sid, &choice_bits) {
                 Ok(values) => values,
                 Err(error) => {
-                    return Err(ErrorMul::new(&format!(
-                        "OTE error during multiplication: {:?}",
-                        error.description
-                    )));
+                    return Err(ErrorMul::from_ot(&error));
                 }
             };
 
@@ -575,7 +609,9 @@ impl<C: DklsCurve> MulReceiver<C> {
         if data_received.verify_u.len() != L as usize
             || data_received.gamma_sender.len() != L as usize
         {
-            return Err(ErrorMul::new("Received data has incorrect dimensions"));
+            return Err(ErrorMul::malformed(
+                "Received data has incorrect dimensions",
+            ));
         }
 
         // Step 3 (Conclusion) - We conclude the OT protocol.
@@ -597,10 +633,7 @@ impl<C: DklsCurve> MulReceiver<C> {
         let ot_outputs: Vec<Vec<C::Scalar>> = match result {
             Ok(out) => out,
             Err(error) => {
-                return Err(ErrorMul::new(&format!(
-                    "OTE error during multiplication: {:?}",
-                    error.description
-                )));
+                return Err(ErrorMul::from_ot(&error));
             }
         };
 

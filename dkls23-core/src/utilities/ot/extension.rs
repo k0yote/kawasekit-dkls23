@@ -361,7 +361,8 @@ impl OTESender {
             .zip(verify_sender.iter())
             .fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
         if !bool::from(consistent) {
-            return Err(ErrorOT::new(
+            // H1: the COTe consistency check is the one leak-bearing OT error — it must ban.
+            return Err(ErrorOT::consistency(
                 "Receiver cheated in OTE: Consistency check failed!",
             ));
         }
