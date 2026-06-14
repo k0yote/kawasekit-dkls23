@@ -36,7 +36,7 @@ wire format or the protocol math, so this **first round** is a **drop-in source 
 
 > **Heads-up on finding IDs.** A later **second self-audit round** (recorded in `docs/audit-findings.md`) reuses
 > the letters **M1/M2/M3/H1** for *different* findings than the first-round table below — read the two as
-> **separate sets**. See [Second self-audit round](#second-self-audit-round-docsaudit-findingsmd) for the
+> **separate sets**. See [Second self-audit round](#second-self-audit-round) for the
 > four fixes it landed, one of which (**M4**, low-S) is a **breaking API change**, so the fork as a whole is no
 > longer a pure drop-in.
 
@@ -80,7 +80,7 @@ gating), and `.github/workflows/feature-guards.yml` asserts them in CI:
 > backend service binary, so the service binary can never link the import code path. This rule also belongs in
 > the deploy runbook (Track D — note it here, do not build Track D now).
 
-## Second self-audit round (`docs/audit-findings.md`)
+## Second self-audit round
 
 A second, independent CTO-class self-audit (recorded in `docs/audit-findings.md`, with a deep-dive in
 `docs/audit-deepdive-signing.md`) walked the OT/VOLE, signing, refresh, and Rust/secret-safety classes and
@@ -145,7 +145,7 @@ remains until upstream ships a stable 0.14, **version-scoped to exact release ca
    backend 4-point + the M6-3a gates + the e2e; update this file's HEAD + base rows.
    - **If the bump crosses the second self-audit round (PRs #15–#18):** drop the `normalize` argument from the
      backend's `SignSession::phase4(received, normalize)` call(s) — the only source change that round requires
-     of the backend (the result is now always low-S). See [Second self-audit round](#second-self-audit-round-docsaudit-findingsmd).
+     of the backend (the result is now always low-S). See [Second self-audit round](#second-self-audit-round).
 5. Land as a reviewed PR — the backend pin bump and the fork HEAD move in the **same** cycle.
 
 ## Status
