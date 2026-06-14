@@ -31,8 +31,14 @@ The backend pins this exact SHA in **two** places — they MUST match, otherwise
 
 Nine commits, `4398d25..4ec716b` on `dev`, plus the A4 build-safety guards below. All are **defensive
 hardening from the crate self-audit** (`docs/security.md` and the mpc-2p `docs/SELF-AUDIT.md`); none change the
-wire format or the protocol math, so the fork is a **drop-in source swap** for the published 0.5.1 (same crate
-name + version `0.5.1`).
+wire format or the protocol math, so this **first round** is a **drop-in source swap** for the published 0.5.1
+(same crate name + version `0.5.1`).
+
+> **Heads-up on finding IDs.** A later **second self-audit round** (recorded in `docs/audit-findings.md`) reuses
+> the letters **M1/M2/M3/H1** for *different* findings than the first-round table below — read the two as
+> **separate sets**. See [Second self-audit round](#second-self-audit-round-docsaudit-findingsmd) for the
+> four fixes it landed, one of which (**M4**, low-S) is a **breaking API change**, so the fork as a whole is no
+> longer a pure drop-in.
 
 | File | Self-audit finding | One-line rationale |
 |---|---|---|
@@ -74,6 +80,33 @@ gating), and `.github/workflows/feature-guards.yml` asserts them in CI:
 > backend service binary, so the service binary can never link the import code path. This rule also belongs in
 > the deploy runbook (Track D — note it here, do not build Track D now).
 
+## Second self-audit round (`docs/audit-findings.md`)
+
+A second, independent CTO-class self-audit (recorded in `docs/audit-findings.md`, with a deep-dive in
+`docs/audit-deepdive-signing.md`) walked the OT/VOLE, signing, refresh, and Rust/secret-safety classes and
+verified the **first-round delta is clean and additive vs upstream `c9c407e`** (no upstream check weakened; the
+protocol math is byte-identical). It produced **four pre-paid-audit fixes**, all landed as reviewed PRs on `dev`.
+
+> Its finding IDs **collide by letter** with the first-round table above — they are a **separate set**. In
+> particular this round's **M2** *completes* the first round's **H1** zeroization sweep, and this round's **M1**
+> is unrelated to the first round's identity-rejection **M1**.
+
+| Finding (2nd round) | What | Files | PR | Drop-in? |
+|---|---|---|---|---|
+| **H1** `[abort]` | Ban a counterparty **only** on the leak-bearing consistency failure (`verify_r`/COTe), not on benign dimension/format errors. `ErrorMul`/`ErrorOT` gain a machine-readable kind. | `protocols/signing.rs`, `utilities/multiplication.rs`, `utilities/ot.rs`, `utilities/ot/extension.rs` | #15 | yes |
+| **M1** `[const-time]` | Make the GF(2²⁰⁸) `field_mul` comb constant-time (drop the secret-dependent branch in the OTE check). | `utilities/ot/extension.rs` | #18 | yes |
+| **M2** `[secret-hygiene]` | Zeroize the EncProof/Chaum-Pedersen witness-bearing nonce — **completes the first round's H1 sweep**. | `utilities/proofs.rs` | #16 | yes |
+| **M4** `[finishing]` | `SignSession::phase4` always emits canonical **low-S** (EIP-2); no knob to emit malleable high-S. | `protocols/sign_session.rs` | #17 | **NO — breaking** |
+
+> **⚠️ M4 is a breaking API change**, so this round is **not** a pure drop-in (unlike round one):
+> `SignSession::phase4(received, normalize)` → `SignSession::phase4(received)`. The low-level
+> `Party::sign_phase4(.., normalize)` is **unchanged** (it remains the explicit opt-out). **Action for the
+> backend:** when bumping the pinned `rev` past this round, **drop the `normalize` argument** from the
+> `SignSession::phase4` call site (behavior becomes always-low-S). See the rebase process below.
+
+Still-open findings from this round (not yet landed; tracked in issue #13): **M3** (fast-refresh consistency
+test), **M5** (supply-chain runbook + yanked-crate check), **M6** (`sign_phase4` hex panic), **L1–L4** (polish).
+
 ## Frozen release-candidate crypto versions
 
 DKLs23 is built on the `k256` / `elliptic-curve` **0.14 release-candidate** line. There is **no stable `k256`
@@ -110,6 +143,9 @@ remains until upstream ships a stable 0.14, **version-scoped to exact release ca
 3. Re-run the full fork CI (`backend-ci`, `clippy`, `fmt-check`, **`supply-chain`**, **`feature-guards`**).
 4. Bump the pinned `rev` in **both** backend `Cargo.toml`s + refresh the backend `Cargo.lock`; re-run the
    backend 4-point + the M6-3a gates + the e2e; update this file's HEAD + base rows.
+   - **If the bump crosses the second self-audit round (PRs #15–#18):** drop the `normalize` argument from the
+     backend's `SignSession::phase4(received, normalize)` call(s) — the only source change that round requires
+     of the backend (the result is now always low-S). See [Second self-audit round](#second-self-audit-round-docsaudit-findingsmd).
 5. Land as a reviewed PR — the backend pin bump and the fork HEAD move in the **same** cycle.
 
 ## Status
