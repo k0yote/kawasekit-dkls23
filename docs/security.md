@@ -57,8 +57,11 @@ This prevents cross-session and cross-derivation transcript reuse.
   `CPProof`, `EncProof`) and the public routing field `parties: PartiesMessage`
   carried by the init carriers above are **broadcast values** — they hold no secret
   material and are `#[zeroize(skip)]`ped where they appear inside a zeroizing struct.
-  The witness-bearing secret is the per-round Schnorr **nonce**, which never enters a
-  proof object: it is held in `Zeroizing` inside `DLogProof::prove` and wiped on return.
+  The witness-bearing secrets are the per-round proof **nonces**, which never enter a
+  proof object: the Schnorr nonce is held in `Zeroizing` inside `DLogProof::prove`, and the
+  Chaum-Pedersen real-branch nonce (witness-bearing in the `EncProof` OR-proof, since the
+  witness is recoverable from it) is held in `Zeroizing` inside `EncProof::prove` — both
+  wiped on return. (The fake-branch challenge is a public proof field, so it is not wiped.)
 
 ## Side-Channel Resistance
 

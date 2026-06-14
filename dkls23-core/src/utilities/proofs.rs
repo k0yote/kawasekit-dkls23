@@ -797,8 +797,12 @@ impl<C: DklsCurve> EncProof<C> {
         // bit = 0 => We want to fake that (g,h,v-h,u) is a DDH tuple (i.e., fake_v = v-h).
         // bit = 1 -> We want to fake that (g,h,v,u) is a DDH tuple (i.e., fake_v = v).
 
-        // Commitments for real proof.
+        // Commitments for real proof. M2 (self-audit): the real nonce is witness-bearing —
+        // `response = k - challenge*x`, so the witness `x` is recoverable from `k` — so hold it
+        // in `Zeroizing` and wipe it on return, mirroring `DLogProof::prove`. (The fake-proof
+        // challenge is a public proof field, not witness-bearing, so it needs no wiping.)
         let (real_scalar_commitment, real_commitments) = CPProof::prove_step1(&base_g, base_h);
+        let real_scalar_commitment = Zeroizing::new(real_scalar_commitment);
 
         // Fake proof.
         let (fake_commitments, fake_challenge, fake_proof) =
@@ -869,7 +873,7 @@ impl<C: DklsCurve> EncProof<C> {
             &base_g,
             base_h,
             scalar,
-            &real_scalar_commitment,
+            &*real_scalar_commitment, // deref Zeroizing<Scalar> -> &Scalar
             &real_challenge,
         );
 
