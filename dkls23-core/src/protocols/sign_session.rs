@@ -67,11 +67,11 @@ impl<'a, C: DklsCurve> SignSession<'a, C> {
         Ok(broadcast)
     }
 
-    pub fn phase4(
-        mut self,
-        received: &[Broadcast3to4<C>],
-        normalize: bool,
-    ) -> Result<EcdsaSignature, Abort> {
+    /// Finalizes the signature. The result is always canonical **low-S** (EIP-2 / BIP-62) —
+    /// there is no caller knob to emit a malleable high-S signature. (The low-level
+    /// [`crate::protocols::Party::sign_phase4`] still exposes the explicit `normalize` flag
+    /// for advanced uses that genuinely need an un-normalized `s`.)
+    pub fn phase4(mut self, received: &[Broadcast3to4<C>]) -> Result<EcdsaSignature, Abort> {
         let x_coord = self.x_coord.take().ok_or_else(|| {
             Abort::recoverable(
                 self.party.party_index,
@@ -82,7 +82,8 @@ impl<'a, C: DklsCurve> SignSession<'a, C> {
         })?;
         let (s_hex, recovery_id) = self
             .party
-            .sign_phase4(&self.data, &x_coord, received, normalize)?;
+            // M4 (self-audit): always normalize to canonical low-S; high-S is malleable.
+            .sign_phase4(&self.data, &x_coord, received, true)?;
 
         let mut r = [0u8; 32];
         let mut s = [0u8; 32];
@@ -109,7 +110,9 @@ impl<'a, C: DklsCurve> SignSession<'a, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k256::elliptic_curve::scalar::IsHigh;
     use k256::elliptic_curve::Field;
+    use k256::elliptic_curve::PrimeField;
     use k256::Scalar;
     use k256::Secp256k1;
 
@@ -222,11 +225,19 @@ mod tests {
         // Phase 4 — consume sessions.
         let some_index = executing_parties[0];
         let session = sessions.remove(&some_index).unwrap();
-        let signature = session.phase4(&broadcasts, true).unwrap();
+        let signature = session.phase4(&broadcasts).unwrap();
 
         // Verify the EcdsaSignature fields are populated.
         assert_ne!(signature.r, [0u8; 32]);
         assert_ne!(signature.s, [0u8; 32]);
+
+        // M4 (self-audit): the SignSession API normalizes to canonical low-S (EIP-2 / BIP-62),
+        // with no caller knob to disable it — a high-S signature is malleable.
+        let s_scalar = Scalar::from_repr(signature.s.into()).unwrap();
+        assert!(
+            !bool::from(s_scalar.is_high()),
+            "the SignSession API must emit low-S (EIP-2 / BIP-62)"
+        );
 
         // Cross-check with verify_ecdsa_signature.
         let r_hex = hex::encode(signature.r);

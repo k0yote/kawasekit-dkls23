@@ -78,6 +78,19 @@ The `insecure-rng` feature is scoped to `cfg(test)` only. Even if the feature
 flag is enabled in a production build, the secure `ThreadRng` is always returned.
 This makes it impossible to accidentally ship deterministic randomness.
 
+## Signature finishing (low-S / malleability)
+
+ECDSA signatures are malleable: `(r, s)` and `(r, n - s)` both verify. The high-level
+**`SignSession::phase4`** always emits the canonical **low-S** form (EIP-2 / BIP-62) and exposes no
+knob to disable it — this is the recommended signing path. The low-level
+`Party::sign_phase4(…, normalize)` keeps an explicit `normalize` flag for advanced callers who
+genuinely need an un-normalized `s`; passing `false` there yields a malleable high-S signature, so
+EVM / Bitcoin signers must not do so.
+
+The `recovery_id` carried by `EcdsaSignature` is a 2-bit value (bit 0 = `R.y` parity, bit 1 =
+`R.x >= n`), **not** the EIP-155 `v`; the consumer derives `v` from it. It is computed *after* low-S
+normalization, so it stays consistent with the emitted `s`.
+
 ## Known Limitations
 
 1. **No hardened BIP-32 derivation**: Only non-hardened derivation is supported
