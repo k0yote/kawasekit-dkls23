@@ -5,6 +5,14 @@
 > all line numbers are `dkls23-core/src/protocols/signing.rs` unless noted. This deepens *one* cluster —
 > it does not replace the per-module context model.
 
+> **⏱ Historical baseline — point-in-time trace.** Written *during* the self-audit against the
+> **pre-hardening** tree to justify finding **H1**; the line numbers below and the "the fix is to…"
+> framing are as-of that baseline. **H1 has since been implemented** — signing now bans on a
+> machine-readable error `kind` (`MulErrorKind` / `OtErrorKind`), and the related M1 / M4 / M6 items
+> landed too. For **current** anchors and the post-hardening model see
+> [`audit-context.md`](audit-context.md) §1 ("Second self-audit round") and §3.7, and `FORK.md`. This
+> trace is intentionally left as-is and is **not** drift-checked (the living `audit-context.md` is — issue #27).
+
 This is the path that actually produces an ECDSA signature and the path where the OT-reuse
 key-extraction risk is contained. Understanding it precisely is what justifies H1's severity.
 
