@@ -4,6 +4,13 @@ CTO-class self-audit of the DKLs23 threshold-ECDSA core. Companion to the
 context model in [`audit-context.md`](audit-context.md). Reviewer persona: external
 cryptographer-and-Rust peer doing the rigorous pass *before* a paid audit is commissioned.
 
+> **⏱ Historical baseline — point-in-time findings.** Recorded *during* the self-audit against the
+> **pre-hardening** tree; the line numbers here are as-of that baseline. **The in-repo findings have since
+> been implemented** (H1, M1–M4, M6, L1, L3, L4 across PRs #15–#25). For the finding→current-location map
+> see [`audit-context.md`](audit-context.md) §1 "Second self-audit round" and `FORK.md`. This report is a
+> historical record and is **not** drift-checked against current source (the living `audit-context.md` is
+> — issue #27); read its line numbers as historical.
+
 ---
 
 ## §1. Executive Summary

@@ -31,8 +31,12 @@ import re
 from collections import namedtuple
 
 SRC_SUBDIR = os.path.join("dkls23-core", "src")
-# Coverage is opt-in per doc: only docs whose citations have been line-verified
-# are linted. Extend this glob (or pass --docs) as other audit docs are verified.
+# Coverage is opt-in, and only LIVING docs (whose citations track current source)
+# belong here. audit-context.md is the system model — linted. audit-findings.md and
+# audit-deepdive-signing.md are point-in-time audit records with as-of-audit line
+# numbers (pinned historical via their banners; see issue #27) — deliberately NOT
+# linted. architecture.md / security.md carry no line citations. Do not add the
+# historical docs here; drift-linting a historical record against current source is wrong.
 DEFAULT_DOCS = "docs/audit-context.md"
 DEFAULT_LOCK = "docs/audit-citations.lock"
 
