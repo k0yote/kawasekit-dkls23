@@ -255,6 +255,20 @@ impl<C: DklsCurve> Party<C> {
         ),
         Abort,
     > {
+        // L1 (self-audit): `mul_sid` / `zero_sid` (oracle domain separators) are a raw
+        // concatenation `… ‖ session_id ‖ sign_id ‖ chain_code` (+ fixed-width party indices).
+        // Validate the two variable-length fields are the canonical `ID_LEN` so the concatenation
+        // is injective — distinct (session_id, sign_id) inputs can never collide into one sid.
+        // (`chain_code` is a fixed `[u8; 32]`.)
+        if self.session_id.len() != crate::utilities::ID_LEN
+            || data.sign_id.len() != crate::utilities::ID_LEN
+        {
+            return Err(Abort::recoverable(
+                self.party_index,
+                AbortReason::MalformedSessionId,
+            ));
+        }
+
         // Step 4 - Check if we have the correct number of counter parties.
         if data.counterparties.len() != (self.parameters.threshold - 1) as usize {
             return Err(Abort::recoverable(
@@ -1892,6 +1906,24 @@ mod tests {
             .expect_err("missing multiplication state should be rejected");
         assert_eq!(abort.kind, AbortKind::Recoverable);
         assert!(matches!(abort.reason, AbortReason::MissingMulState { .. }));
+    }
+
+    /// L1 (self-audit): a non-`ID_LEN` `sign_id` must be rejected so the session-id concatenation
+    /// (`mul_sid` / `zero_sid`) stays injective — distinct inputs cannot collide into one sid.
+    #[test]
+    fn test_sign_phase1_rejects_malformed_sign_id() {
+        let (parties, all_data, _, _, _) = setup_two_party_signing_phase1();
+        let mut data = all_data
+            .get(&PartyIndex::new(1).unwrap())
+            .expect("party data should exist")
+            .clone();
+        data.sign_id = vec![0u8; crate::utilities::ID_LEN - 1]; // not the canonical ID_LEN
+
+        let abort = parties[0]
+            .sign_phase1(&data)
+            .expect_err("a malformed sign_id length must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(matches!(abort.reason, AbortReason::MalformedSessionId));
     }
 
     #[allow(clippy::type_complexity)]
