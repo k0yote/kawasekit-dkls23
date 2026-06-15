@@ -1531,6 +1531,202 @@ mod tests {
         assert!(matches!(abort.reason, AbortReason::TrivialKeyShare));
     }
 
+    /// M3 (self-audit) — deferred-detection round trip: a fast refresh that produces an inconsistent
+    /// OT correlation (simulated by corrupting one refreshed party's re-randomized OT seeds — a bad
+    /// pad application that slipped past refresh) is NOT caught during refresh. It surfaces at the
+    /// NEXT signing, whose multiplication COTe consistency check fails and BANS the counterparty.
+    /// This pins the deferred-detection design documented at the fast-refresh re-randomization block.
+    #[test]
+    fn test_corrupted_fast_refresh_is_banned_at_next_signing() {
+        let parameters = Parameters {
+            threshold: 2,
+            share_count: 2,
+        };
+        let session_id = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
+        let secret_key = k256::Scalar::random(&mut rng::get_rng());
+        let (mut parties, _) =
+            re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
+                String::new()
+            });
+
+        let refresh_sid = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
+
+        // --- a full, valid 2-of-2 fast refresh -> refreshed parties ---
+        let mut dkg_1: Vec<Vec<k256::Scalar>> = Vec::new();
+        for i in 0..parameters.share_count {
+            dkg_1.push(parties[i as usize].refresh_phase1());
+        }
+        let mut poly_fragments = vec![Vec::<k256::Scalar>::new(); parameters.share_count as usize];
+        for row in dkg_1 {
+            for j in 0..parameters.share_count {
+                poly_fragments[j as usize].push(row[j as usize]);
+            }
+        }
+        let mut correction_values: Vec<k256::Scalar> = Vec::new();
+        let mut proofs_commitments: Vec<ProofCommitment<Secp256k1>> = Vec::new();
+        let mut kept_2to3: Vec<BTreeMap<PartyIndex, KeepRefreshPhase2to3>> = Vec::new();
+        let mut transmit_2to4: Vec<Vec<TransmitRefreshPhase2to4>> = Vec::new();
+        for i in 0..parameters.share_count {
+            let (c, pc, k, t) =
+                parties[i as usize].refresh_phase2(&refresh_sid, &poly_fragments[i as usize]);
+            correction_values.push(c);
+            proofs_commitments.push(pc);
+            kept_2to3.push(k);
+            transmit_2to4.push(t);
+        }
+        let received_2to4: Vec<Vec<TransmitRefreshPhase2to4>> = (1..=parameters.share_count)
+            .map(|i| {
+                let idx = PartyIndex::new(i).unwrap();
+                transmit_2to4
+                    .iter()
+                    .flatten()
+                    .filter(|m| m.parties.receiver == idx)
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+        let mut kept_3to4: Vec<BTreeMap<PartyIndex, KeepRefreshPhase3to4>> = Vec::new();
+        let mut transmit_3to4: Vec<Vec<TransmitRefreshPhase3to4>> = Vec::new();
+        for i in 0..parameters.share_count {
+            let (k, t) = parties[i as usize].refresh_phase3(&kept_2to3[i as usize]);
+            kept_3to4.push(k);
+            transmit_3to4.push(t);
+        }
+        let received_3to4: Vec<Vec<TransmitRefreshPhase3to4>> = (1..=parameters.share_count)
+            .map(|i| {
+                let idx = PartyIndex::new(i).unwrap();
+                transmit_3to4
+                    .iter()
+                    .flatten()
+                    .filter(|m| m.parties.receiver == idx)
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+        let mut refreshed: Vec<Party<Secp256k1>> = Vec::new();
+        for i in 0..parameters.share_count {
+            refreshed.push(
+                parties[i as usize]
+                    .refresh_phase4(
+                        &refresh_sid,
+                        &correction_values[i as usize],
+                        &proofs_commitments,
+                        &kept_3to4[i as usize],
+                        &received_2to4[i as usize],
+                        &received_3to4[i as usize],
+                    )
+                    .expect("a valid fast refresh should succeed"),
+            );
+        }
+
+        // --- corrupt party 1's re-randomized OT *sender* correlation for the pair (a bad pad
+        //     application that slipped past refresh). The COTe consistency check exists precisely to
+        //     detect a receiver inconsistent with the sender's correlation, so flipping party 1's
+        //     correlation makes its own check (run when it is the multiplication sender in phase 2)
+        //     fail against the honest counterparty — deterministically, independent of the
+        //     protocol's randomness. (Corrupting a single receiver *seed* instead would flow
+        //     consistently into both parties' views and stay self-consistent — no ban.) ---
+        let p1 = PartyIndex::new(1).unwrap();
+        let p2 = PartyIndex::new(2).unwrap();
+        {
+            let corr = &mut refreshed[0]
+                .mul_senders
+                .get_mut(&p2)
+                .expect("party 1 has a mul_sender for party 2")
+                .ote_sender
+                .correlation;
+            corr[0] = !corr[0];
+        }
+
+        // --- next signing must catch it as a BanCounterparty (deferred detection) ---
+        let sign_id = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
+        let message_hash = tagged_hash(b"test-sign", &[b"deferred-detection"]);
+        let data1 = SignData {
+            sign_id: sign_id.to_vec(),
+            counterparties: vec![p2],
+            message_hash,
+        };
+        let data2 = SignData {
+            sign_id: sign_id.to_vec(),
+            counterparties: vec![p1],
+            message_hash,
+        };
+
+        // Drive the next signing end-to-end. The corruption surfaces as a BanCounterparty — either
+        // at the honest party's COTe check in phase 2, or (when that check's random `correlation`
+        // bit masks the single corrupted column) at the corrupted party's verify_r in phase 3.
+        // Either way, signing must ban — that IS the deferred detection.
+        let datas = [data1, data2];
+        let idxs = [p1, p2];
+
+        let mut uk = Vec::new();
+        let mut kept = Vec::new();
+        let mut transmit_1to2: Vec<Vec<TransmitPhase1to2>> = Vec::new();
+        for i in 0..2 {
+            let (u, k, t) = refreshed[i].sign_phase1(&datas[i]).expect("sign phase1");
+            uk.push(u);
+            kept.push(k);
+            transmit_1to2.push(t);
+        }
+        let received_1to2: Vec<Vec<TransmitPhase1to2>> = (0..2)
+            .map(|i| {
+                transmit_1to2
+                    .iter()
+                    .flatten()
+                    .filter(|m| m.parties.receiver == idxs[i])
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+
+        // Phase 2 — a ban may land here (honest party's COTe consistency check).
+        let mut uk2 = Vec::new();
+        let mut kept2 = Vec::new();
+        let mut transmit_2to3: Vec<Vec<TransmitPhase2to3<Secp256k1>>> = Vec::new();
+        let mut banned = false;
+        for i in 0..2 {
+            match refreshed[i].sign_phase2(&datas[i], &uk[i], &kept[i], &received_1to2[i]) {
+                Ok((u, k, t)) => {
+                    uk2.push(u);
+                    kept2.push(k);
+                    transmit_2to3.push(t);
+                }
+                Err(abort) => {
+                    assert!(matches!(abort.kind, AbortKind::BanCounterparty(_)));
+                    banned = true;
+                    break;
+                }
+            }
+        }
+
+        // Phase 3 — otherwise the corrupted party's verify_r consistency check bans here.
+        if !banned {
+            let received_2to3: Vec<Vec<TransmitPhase2to3<Secp256k1>>> = (0..2)
+                .map(|i| {
+                    transmit_2to3
+                        .iter()
+                        .flatten()
+                        .filter(|m| m.parties.receiver == idxs[i])
+                        .cloned()
+                        .collect()
+                })
+                .collect();
+            for i in 0..2 {
+                if let Err(abort) =
+                    refreshed[i].sign_phase3(&datas[i], &uk2[i], &kept2[i], &received_2to3[i])
+                {
+                    assert!(matches!(abort.kind, AbortKind::BanCounterparty(_)));
+                    banned = true;
+                }
+            }
+        }
+
+        assert!(
+            banned,
+            "a corrupted fast-refresh OT correlation must be caught (banned) by the next signing"
+        );
+    }
+
     /// Tests that complete refresh phase 4 aborts (recoverably) on tampered OT DLog proofs.
     #[test]
     fn test_refresh_complete_phase4_aborts_on_tampered_dlog_proof() {
