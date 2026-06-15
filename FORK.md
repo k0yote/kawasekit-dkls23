@@ -140,7 +140,11 @@ remains until upstream ships a stable 0.14, **version-scoped to exact release ca
    catch newly-published advisories against the frozen rc tree.
 2. To take an upstream fix: rebase the kawasekit delta onto the new upstream tag on a topic branch; resolve
    conflicts only in the touched files; keep the delta minimal (no new behavior).
-3. Re-run the full fork CI (`backend-ci`, `clippy`, `fmt-check`, **`supply-chain`**, **`feature-guards`**).
+3. Re-run the full fork CI (`backend-ci`, `clippy`, `fmt-check`, **`supply-chain`**, **`feature-guards`**, **`docs-citations`**).
+   - **Doc citations (#27):** the audit docs are line-anchored; `docs-citations.yml` snapshots every cited
+     source line into `docs/audit-citations.lock` and fails when a cited line's content drifts. After a rebase
+     that shifts source lines — or any intentional re-grounding of `docs/audit-context.md` — re-verify the
+     affected citations, then re-bless the lock: `python3 tools/check_doc_citations.py --update`.
 4. Bump the pinned `rev` in **both** backend `Cargo.toml`s + refresh the backend `Cargo.lock`; re-run the
    backend 4-point + the M6-3a gates + the e2e; update this file's HEAD + base rows.
    - **If the bump crosses the second self-audit round (PRs #15–#18):** drop the `normalize` argument from the
