@@ -1,3 +1,4 @@
+AEAD
 Arbitrum
 bealore
 bech
@@ -10,6 +11,7 @@ commitlint
 commitlintrc
 comms
 consts
+cov
 CSPRNG
 ddaa
 decommitment
@@ -18,7 +20,10 @@ decommitted
 diffed
 Diffing
 dkls
+DSG
 dudect
+dylint
+Dylint
 ECDLP
 ENCPROOF
 eqn
@@ -26,6 +31,7 @@ evals
 EVM
 exploitability
 fabio
+feldman
 fischlin
 fixint
 Fordefi
@@ -35,6 +41,7 @@ idx
 integrators
 kawasekit
 keypair
+keyshare
 kryptology
 libdkls
 Litecoin
@@ -45,6 +52,9 @@ Misrouted
 misrouting
 mpc
 Paillier
+pprf
+PPRF
+proptest
 PUSHDATA
 randomizers
 recid
@@ -77,6 +87,8 @@ workflows
 WPKH
 xcarbon
 XCoordinate
+XOF
+XORs
 zeroization
 Zeroization
 zeroized
