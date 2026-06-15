@@ -296,6 +296,9 @@ pub enum AbortReason {
         index: PartyIndex,
     },
     SelfInCounterparties,
+    /// `session_id` or `sign_id` is not the canonical `ID_LEN` length, so the session-id
+    /// concatenation used for oracle domain separation would not be injective (self-audit L1).
+    MalformedSessionId,
     MissingMulState {
         counterparty: PartyIndex,
     },
@@ -391,6 +394,9 @@ impl fmt::Display for AbortReason {
                 write!(f, "duplicate counterparty: {index}")
             }
             Self::SelfInCounterparties => write!(f, "own index in counterparty list"),
+            Self::MalformedSessionId => {
+                write!(f, "session_id / sign_id must be ID_LEN bytes")
+            }
             Self::MissingMulState { counterparty } => {
                 write!(f, "missing multiplication state for party {counterparty}")
             }
