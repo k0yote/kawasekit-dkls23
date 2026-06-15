@@ -82,6 +82,10 @@ impl<C: DklsCurve> OTSender<C> {
             s = <C::Scalar as Field>::random(&mut rng::get_rng());
         }
 
+        // L3 (self-audit): RNG-sanity fail-stop, not attacker-reachable (see `dkg::step3`). The
+        // Fischlin search succeeds with overwhelming probability under any working CSPRNG and is
+        // driven by the prover's own secret + RNG; exhaustion implies a broken RNG, under which the
+        // scheme is void — failing fast is the safe outcome.
         let proof = DLogProof::<C>::prove(&s, session_id)
             .expect("Fischlin proof-of-work search exhausted — RNG failure");
 
