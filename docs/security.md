@@ -91,6 +91,20 @@ The `recovery_id` carried by `EcdsaSignature` is a 2-bit value (bit 0 = `R.y` pa
 `R.x >= n`), **not** the EIP-155 `v`; the consumer derives `v` from it. It is computed *after* low-S
 normalization, so it stays consistent with the emitted `s`.
 
+## Supply chain
+
+The crypto stack is version-scoped to **exact `k256` / `elliptic-curve` 0.14 release candidates** (there
+is no stable `k256` 0.14 — see [FORK.md](../FORK.md)). `supply-chain.yml` runs `cargo audit` and
+`cargo deny check advisories bans licenses sources` on every dependency change, on PRs, and **weekly** (a
+new advisory against the frozen tree needs no code change to become relevant). `deny.toml` denies unknown
+registries / git sources and unapproved licenses, and **surfaces** yanked crates (`yanked = "warn"`):
+`crypto-bigint 0.7.1` is yanked but is the version the frozen rc tree resolves to, so it is reported, not failed.
+
+**Authoritative lock.** The fork's standalone `Cargo.lock` is allowed to float on the rc line (used only by
+the fork's own CI); the **backend's committed `Cargo.lock` is what ships and what the third-party audit
+targets**. Before a release, that backend lock must be `cargo audit` / `cargo deny` clean — no yanked crate,
+no new advisory — and a new advisory there is **release-blocking**. See FORK.md's rebase runbook.
+
 ## Known Limitations
 
 1. **No hardened BIP-32 derivation**: Only non-hardened derivation is supported
