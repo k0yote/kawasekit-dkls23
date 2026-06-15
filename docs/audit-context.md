@@ -12,7 +12,7 @@
 > cryptographic audit. It does **not** clear a mainnet / real-value gate. The crate is
 > `UNAUDITED` (see [`../FORK.md`](../FORK.md)); testnet / no-value only.
 >
-> **Refresh (2026-06-15, `dev`@`c3eadd3`):** this doc was first built on the *pre-hardening* tree. The
+> **Refresh (2026-06-15, current `dev`):** this doc was first built on the *pre-hardening* tree. The
 > second self-audit round has since merged (11 fix-PRs, #15–#25); the model below is re-grounded against
 > current `dev`. The load-bearing change: the abort/ban decision is now driven by a **machine-readable
 > error `kind`** (`OtErrorKind`/`MulErrorKind`), not by `Result` presence — see §3.7, §6, and the
@@ -70,7 +70,7 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 > [`../FORK.md`](../FORK.md)). The **second** round (this audit; IDs from [`audit-findings.md`](audit-findings.md))
 > reuses the letters H1 / M1 / M2 / M3 for *different* issues — do not conflate the two.
 
-#### Second self-audit round (merged 2026-06; `audit-findings.md` IDs; verified against `dev`@`c3eadd3`)
+#### Second self-audit round (merged 2026-06; `audit-findings.md` IDs; verified against current `dev`)
 
 | ID | Class | What | Where (current lines) |
 |----|-------|------|------|
