@@ -146,6 +146,12 @@ remains until upstream ships a stable 0.14, **version-scoped to exact release ca
    - **If the bump crosses the second self-audit round (PRs #15–#18):** drop the `normalize` argument from the
      backend's `SignSession::phase4(received, normalize)` call(s) — the only source change that round requires
      of the backend (the result is now always low-S). See [Second self-audit round](#second-self-audit-round).
+   - **Supply chain (2nd-round M5):** after refreshing the backend `Cargo.lock`, run `cargo audit` and
+     `cargo deny check` on the **backend** tree and confirm its frozen lock carries **no yanked crate** and no
+     new advisory. The fork's *standalone* lock is allowed to float — `deny.toml` sets `yanked = "warn"` for the
+     frozen-tree `crypto-bigint 0.7.1`, surfaced not failed — but the **backend's authoritative lock is what
+     ships**, so a yanked crate or a new advisory **there** is release-blocking. A new advisory against the
+     frozen rc tree needs no code change to become relevant, which is why `supply-chain.yml` also runs weekly.
 5. Land as a reviewed PR — the backend pin bump and the fork HEAD move in the **same** cycle.
 
 ## Status
