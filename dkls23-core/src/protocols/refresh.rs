@@ -1032,6 +1032,15 @@ impl<C: DklsCurve> Party<C> {
         }
 
         // Having the seeds, we can update the data for multiplication.
+        //
+        // M3 (self-audit) — design note on consistency: fast refresh re-randomizes the existing OT
+        // correlations *in place* from the pair-shared seed (the Beaver-trick XOR below); unlike a
+        // full re-init it runs NO in-protocol consistency check on the result and trusts the
+        // pre-existing correlations (existence-checked only). A counterparty that corrupts its half
+        // of the re-randomization is therefore NOT caught here — detection is DEFERRED to the next
+        // signing, whose `verify_r` / COTe consistency check fails and bans the counterparty
+        // (`AbortKind::BanCounterparty`). This deferral is intentional; a caller needing immediate,
+        // identifiable refresh-time fault attribution should use the complete refresh instead.
 
         let mut mul_senders: BTreeMap<PartyIndex, MulSender<C>> = BTreeMap::new();
         let mut mul_receivers: BTreeMap<PartyIndex, MulReceiver<C>> = BTreeMap::new();
@@ -1429,6 +1438,95 @@ mod tests {
             &data.mul_received_3to4[0],
         );
         let abort = result.expect_err("a trivial refreshed key share must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(matches!(abort.reason, AbortReason::TrivialKeyShare));
+    }
+
+    /// M3 (self-audit): the **fast** refresh path must also reject a degenerate refreshed share
+    /// (refreshed `poly_point` == 0), mirroring the complete-refresh check. This pins the
+    /// previously-untested fast-path M3 guard and confirms it is reachable (a Wave-2 open question).
+    #[test]
+    fn test_refresh_phase4_rejects_trivial_key_share() {
+        let parameters = Parameters {
+            threshold: 2,
+            share_count: 2,
+        };
+        let session_id = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
+        let secret_key = k256::Scalar::random(&mut rng::get_rng());
+        let (mut parties, _) =
+            re_key::<Secp256k1>(&parameters, &session_id, &secret_key, None, |_| {
+                String::new()
+            });
+
+        let refresh_sid = rng::get_rng().random::<[u8; SESSION_ID_LEN]>();
+
+        // Phase 1 — fragments.
+        let mut dkg_1: Vec<Vec<k256::Scalar>> = Vec::with_capacity(parameters.share_count as usize);
+        for i in 0..parameters.share_count {
+            dkg_1.push(parties[i as usize].refresh_phase1());
+        }
+        let mut poly_fragments = vec![Vec::<k256::Scalar>::new(); parameters.share_count as usize];
+        for row_i in dkg_1 {
+            for j in 0..parameters.share_count {
+                poly_fragments[j as usize].push(row_i[j as usize]);
+            }
+        }
+
+        // Phase 2.
+        let mut proofs_commitments: Vec<ProofCommitment<Secp256k1>> = Vec::new();
+        let mut kept_2to3: Vec<BTreeMap<PartyIndex, KeepRefreshPhase2to3>> = Vec::new();
+        let mut transmit_2to4: Vec<Vec<TransmitRefreshPhase2to4>> = Vec::new();
+        for i in 0..parameters.share_count {
+            let (_correction, pc, k, t) =
+                parties[i as usize].refresh_phase2(&refresh_sid, &poly_fragments[i as usize]);
+            proofs_commitments.push(pc);
+            kept_2to3.push(k);
+            transmit_2to4.push(t);
+        }
+        let received_2to4: Vec<Vec<TransmitRefreshPhase2to4>> = (1..=parameters.share_count)
+            .map(|i| {
+                let i_idx = PartyIndex::new(i).unwrap();
+                transmit_2to4
+                    .iter()
+                    .flatten()
+                    .filter(|m| m.parties.receiver == i_idx)
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+
+        // Phase 3.
+        let mut kept_3to4: Vec<BTreeMap<PartyIndex, KeepRefreshPhase3to4>> = Vec::new();
+        let mut transmit_3to4: Vec<Vec<TransmitRefreshPhase3to4>> = Vec::new();
+        for i in 0..parameters.share_count {
+            let (k, t) = parties[i as usize].refresh_phase3(&kept_2to3[i as usize]);
+            kept_3to4.push(k);
+            transmit_3to4.push(t);
+        }
+        let received_3to4: Vec<Vec<TransmitRefreshPhase3to4>> = (1..=parameters.share_count)
+            .map(|i| {
+                let i_idx = PartyIndex::new(i).unwrap();
+                transmit_3to4
+                    .iter()
+                    .flatten()
+                    .filter(|m| m.parties.receiver == i_idx)
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+
+        // Phase 4 with a DEGENERATE correction that cancels the share ⇒ refreshed poly_point = 0.
+        let degenerate = -parties[0].poly_point;
+        let result = parties[0].refresh_phase4(
+            &refresh_sid,
+            &degenerate,
+            &proofs_commitments,
+            &kept_3to4[0],
+            &received_2to4[0],
+            &received_3to4[0],
+        );
+        let abort =
+            result.expect_err("a trivial refreshed key share must be rejected (fast refresh)");
         assert_eq!(abort.kind, AbortKind::Recoverable);
         assert!(matches!(abort.reason, AbortReason::TrivialKeyShare));
     }
