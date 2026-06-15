@@ -1,0 +1,30 @@
+name: Doc citations
+
+# Guards the line-anchored audit docs against citation drift: any `file.rs:NNN`
+# cited by docs/audit-context.md whose target source line's content changes will
+# fail this check, forcing the citation (or the lock) to be re-verified.
+# See tools/check_doc_citations.py and issue #27.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  check-citations:
+    name: Check audit-doc line citations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Unit tests for the citation linter
+        run: python3 tools/test_check_doc_citations.py
+      - name: Verify audit-doc citations are in sync with source
+        run: python3 tools/check_doc_citations.py --check

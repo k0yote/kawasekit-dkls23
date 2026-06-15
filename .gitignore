@@ -3,3 +3,6 @@
 .gemini/
 .coder/
 CLAUDE.md
+# python tooling (tools/)
+__pycache__/
+*.pyc
