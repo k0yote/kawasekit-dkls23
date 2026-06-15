@@ -2394,10 +2394,10 @@ mod tests {
             &received_2to3,
         );
 
-        // "nothex" is not valid hex — the low-level API must reject it cleanly.
+        // A malformed x_coord (odd-length, not a 32-byte hex string) must be rejected cleanly.
         let result = parties[0].sign_phase4(
             all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
-            "nothex",
+            "0",
             &broadcasts,
             true,
         );
