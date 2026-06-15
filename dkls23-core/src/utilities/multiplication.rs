@@ -214,6 +214,10 @@ impl<C: DklsCurve> MulSender<C> {
 
         // We compute the public gadget vector from the nonce, in the same way as in
         // https://gitlab.com/neucrypt/mpecdsa/-/blob/release/src/mul.rs.
+        // L4 (self-audit): both parties derive `public_gadget` independently from the same
+        // (nonce, session_id) — it is NOT asserted equal across parties at runtime. A mismatch is
+        // fail-safe: it makes the downstream `verify_r` consistency check fail (=> BanCounterparty),
+        // so a gadget disagreement cannot silently corrupt a signature.
         let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
         let mut counter = *nonce;
         for _ in 0..BATCH_SIZE {
@@ -469,6 +473,10 @@ impl<C: DklsCurve> MulReceiver<C> {
 
         // We compute the public gadget vector from the nonce, in the same way as in
         // https://gitlab.com/neucrypt/mpecdsa/-/blob/release/src/mul.rs.
+        // L4 (self-audit): both parties derive `public_gadget` independently from the same
+        // (nonce, session_id) — it is NOT asserted equal across parties at runtime. A mismatch is
+        // fail-safe: it makes the downstream `verify_r` consistency check fail (=> BanCounterparty),
+        // so a gadget disagreement cannot silently corrupt a signature.
         let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
         let mut counter = *nonce;
         for _ in 0..BATCH_SIZE {

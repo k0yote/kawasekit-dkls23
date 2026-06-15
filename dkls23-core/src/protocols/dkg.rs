@@ -346,6 +346,12 @@ pub(crate) fn step3<C: DklsCurve>(
 ) -> (C::Scalar, ProofCommitment<C>) {
     let poly_point: C::Scalar = poly_fragments.iter().copied().sum();
 
+    // L3 (self-audit): this `.expect` is an RNG-sanity fail-stop, NOT an attacker-reachable panic.
+    // The Fischlin search finds an L/4-byte collision with overwhelming probability (~2^{2L}=256
+    // expected tries within a 2^32 budget) under any working CSPRNG, and the prover drives it with
+    // its OWN secret + RNG — an attacker cannot induce exhaustion. Exhaustion implies a broken RNG,
+    // under which the whole scheme is void anyway, so failing fast is the safe outcome. (A `Result`
+    // here would ripple through DKG/OT/session signatures for a condition unreachable in practice.)
     let (proof, commitment) = DLogProof::<C>::prove_commit(&poly_point, session_id)
         .expect("Fischlin proof-of-work search exhausted — RNG failure");
     let proof_commitment = ProofCommitment {
