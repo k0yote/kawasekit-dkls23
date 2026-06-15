@@ -915,6 +915,22 @@ impl<C: DklsCurve> Party<C> {
                 ));
             }
         };
+        // M6 (self-audit): validate `x_coord` (the ECDSA `r`) here — after the zero-denominator
+        // check, before it is first used. Reject malformed hex with a precise
+        // `InvalidXCoordinateHex` abort. The recovery-id path below decodes `x_coord` with
+        // `.expect("valid hex")`; that was only gated by `verify_ecdsa_signature` running first, so
+        // validating removes the latent panic under any reorder and replaces the misleading
+        // `SignatureVerificationFailed` with a precise reason.
+        {
+            let mut x_coord_bytes = vec![0u8; elliptic_curve::FieldBytes::<C>::default().len()];
+            if hex::decode_to_slice(x_coord, &mut x_coord_bytes).is_err() {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::InvalidXCoordinateHex,
+                ));
+            }
+        }
+
         let mut s = numerator * denominator_inverse;
 
         // Normalize signature into "low S" form as described in
@@ -2352,5 +2368,41 @@ mod tests {
             abort.reason,
             AbortReason::SignatureVerificationFailed
         ));
+    }
+
+    /// M6 (self-audit): a malformed `x_coord` given to the low-level `sign_phase4` returns the
+    /// precise `InvalidXCoordinateHex` abort (recoverable), not the misleading
+    /// `SignatureVerificationFailed`, and never reaches the `.expect("valid hex")` in the
+    /// recovery-id path. (The panic was already gated by `verify_ecdsa_signature`; validating
+    /// `x_coord` up front gives a precise reason and removes the latent panic under any reorder.)
+    #[test]
+    fn test_sign_phase4_rejects_malformed_x_coord() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+        let (unique_kept_2to3, kept_2to3, received_2to3) = run_two_party_phase2(
+            &parties,
+            &all_data,
+            &unique_kept_1to2,
+            &kept_1to2,
+            &received_1to2,
+        );
+        let (_x_coord, broadcasts) = run_two_party_phase3(
+            &parties,
+            &all_data,
+            &unique_kept_2to3,
+            &kept_2to3,
+            &received_2to3,
+        );
+
+        // "nothex" is not valid hex — the low-level API must reject it cleanly.
+        let result = parties[0].sign_phase4(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            "nothex",
+            &broadcasts,
+            true,
+        );
+        let abort = result.expect_err("malformed x_coord must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(matches!(abort.reason, AbortReason::InvalidXCoordinateHex));
     }
 }
