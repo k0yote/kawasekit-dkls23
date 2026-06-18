@@ -1,0 +1,20 @@
+# typos (crate-ci/typos) configuration — https://github.com/crate-ci/typos
+#
+# Replaces check-spelling/check-spelling, retired after the upstream maintainer
+# account compromise of 2026-06-16 (the action self-aborts via a remote
+# kill-switch on its latest release v0.0.26). Unlike check-spelling — which flags
+# every word missing from a dictionary — typos is corrections-based: it only
+# flags known misspellings, so it needs overrides only for domain terms it
+# mistakes for typos, not the full former expect/allow word lists.
+
+[default.extend-words]
+# "OT" = oblivious transfer — pervasive across the DKLs23 core, in all cases.
+ot = "ot"
+# Deliberate plural-of-`data` test-fixture identifier (refresh.rs sign tests).
+datas = "datas"
+# The "mis-" prefix ("mis-integrated") in a pinned historical audit doc.
+mis = "mis"
+
+[files]
+# Lockfiles carry third-party crate names that are not prose.
+extend-exclude = ["Cargo.lock", "*.lock"]

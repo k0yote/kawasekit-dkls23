@@ -1,48 +1,25 @@
-# The configs for this spell check can be find at /.github/actions/spelling/
+# Spell checking via crate-ci/typos.
+#
+# Replaces check-spelling/check-spelling@v0.0.26, retired after the upstream
+# maintainer-account compromise of 2026-06-16 (that action self-aborts through a
+# remote kill-switch). typos is a self-contained, corrections-based checker;
+# its config lives in /typos.toml. The third-party action is SHA-pinned.
 name: Spell checking
+
 on:
   push:
     branches: [main, dev]
-  pull_request_target:
+  pull_request:
     branches: [main, dev]
-    types:
-      - 'opened'
-      - 'reopened'
-      - 'synchronize'
+    types: [opened, reopened, synchronize]
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
-    spelling:
-        name: Spell checking
-        permissions:
-          contents: read
-          pull-requests: read
-          actions: read
-        runs-on: ubuntu-latest
-        if: ${{ (contains(github.event_name, 'pull_request') && github.event.pull_request.state == 'open') || github.event_name == 'push' }}
-        steps:
-            - name: check-spelling
-              uses: check-spelling/check-spelling@cfb6f7e75bbfc89c71eaa30366d0c166f1bd9c8c # v0.0.26
-              with:
-                  config: .github/actions/spelling
-                  checkout: true
-                  check_file_names: 1
-                  disable_checks: noisy-file
-                  post_comment: 0
-                  extra_dictionaries: cspell:public-licenses/src/generated/public-licenses.txt
-                      cspell:cryptocurrencies/cryptocurrencies.txt
-                      cspell:software-terms/dict/networkingTerms.txt
-                      cspell:software-terms/dict/softwareTerms.txt
-                      cspell:bash/dict/bash-words.txt
-                      cspell:filetypes/filetypes.txt
-                      cspell:fonts/fonts.txt
-                      cspell:fullstack/dict/fullstack.txt
-                      cspell:rust/dict/rust.txt
-                      cspell:typescript/dict/typescript.txt
-                      cspell:sql/src/sql.txt
-                      cspell:pt_BR/src/hunspell/index.dic
-                      cspell:pt_BR/src/hunspell/index.aff
-                      cspell:npm/dict/npm.txt
-                      cspell:node/dict/node.txt
-                      cspell:docker/src/docker-words.txt
+  spelling:
+    name: Spell checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2

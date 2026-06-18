@@ -1315,7 +1315,7 @@ mod tests {
             .into_iter()
             .all(move |x| sender_without_repetitions.insert(x))
         {
-            panic!("Very improbable/unexpected: The sender got two identic outputs!");
+            panic!("Very improbable/unexpected: The sender got two identical outputs!");
         }
 
         let mut receiver_without_repetitions: HashSet<Vec<u8>> =
@@ -1324,7 +1324,7 @@ mod tests {
             .into_iter()
             .all(move |x| receiver_without_repetitions.insert(x))
         {
-            panic!("Very improbable/unexpected: The receiver got two identic outputs!");
+            panic!("Very improbable/unexpected: The receiver got two identical outputs!");
         }
 
         // This check guards against a past bug where an old implementation
