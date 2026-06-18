@@ -45,10 +45,12 @@ use crate::curve::DklsCurve;
 use crate::protocols::{Abort, AbortReason, PartiesMessage, Party, PartyIndex};
 
 use crate::utilities::commits::{commit_point, verify_commitment_point};
-use crate::utilities::hashes::HashOutput;
+use crate::utilities::hashes::{tagged_hash, HashOutput};
 use crate::utilities::multiplication::{MulDataToKeepReceiver, MulDataToReceiver, MulErrorKind};
+use crate::utilities::oracle_tags::TAG_ROOT_AGREEMENT;
 use crate::utilities::ot::extension::OTEDataToSender;
 use crate::utilities::rng;
+use subtle::ConstantTimeEq;
 
 /// Data needed to start the signature and is used during the phases.
 #[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -71,6 +73,13 @@ pub struct SignData {
 pub struct TransmitPhase1to2 {
     pub parties: PartiesMessage,
     pub commitment: HashOutput,
+    /// H1 (ToB TOB-SILA-7+8): Fiat-Shamir echo of the assembled DKG root
+    /// (`chain_code`) and the session identifiers (`session_id` / `sign_id`).
+    /// Cross-checked in phase 2 *before* any leak-bearing OT/multiplication step,
+    /// so a divergent-but-valid root view aborts recoverably and identifiably
+    /// instead of banning an honest party. Carries no secret (the chain code and
+    /// session ids are public), so it is broadcast in the clear.
+    pub root_digest: HashOutput,
     #[zeroize(skip)]
     pub mul_transmit: OTEDataToSender,
 }
@@ -337,6 +346,17 @@ impl<C: DklsCurve> Party<C> {
         let mut keep: BTreeMap<PartyIndex, KeepPhase1to2<C>> = BTreeMap::new();
         let mut transmit: Vec<TransmitPhase1to2> =
             Vec::with_capacity((self.parameters.threshold - 1) as usize);
+
+        // H1 (ToB TOB-SILA-7+8): broadcast a Fiat-Shamir echo of the assembled DKG
+        // root + session identifiers so phase 2 can cross-verify *agreement* (not
+        // just per-party binding) before any leak-bearing step. The value is the
+        // same for every counterparty (it depends only on the agreed root).
+        let root_digest = root_agreement_digest(
+            &self.session_id,
+            &data.sign_id,
+            &self.derivation_data.chain_code,
+        );
+
         for counterparty in &data.counterparties {
             // Commit functionality.
             let (commitment, salt) = commit_point::<C>(&instance_point);
@@ -395,6 +415,7 @@ impl<C: DklsCurve> Party<C> {
                     receiver: *counterparty,
                 },
                 commitment,
+                root_digest,
                 mul_transmit,
             });
         }
@@ -510,6 +531,32 @@ impl<C: DklsCurve> Party<C> {
                 },
             ));
         }
+
+        // H1 (ToB TOB-SILA-7+8): cross-party agreement on the assembled DKG root
+        // (`chain_code`) and the session identifiers, verified BEFORE any
+        // leak-bearing OT/multiplication step. DKG binds each aux chain code but
+        // never cross-verifies the *assembled* root, and `session_id` enters the
+        // keyshare unchecked — so a divergent-but-valid view (an equivocating relay
+        // or, at t-of-n ≥ 3, participant) would otherwise surface only at the
+        // phase-2 COTe consistency check and `Abort::ban` an *honest* party
+        // (key-destruction class). Here it is an early, recoverable, identifiable
+        // abort. Compared in constant time; the digest carries no secret.
+        let our_root_digest = root_agreement_digest(
+            &self.session_id,
+            &data.sign_id,
+            &self.derivation_data.chain_code,
+        );
+        for message in received {
+            if !bool::from(message.root_digest.ct_eq(&our_root_digest)) {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::RootAgreementMismatch {
+                        counterparty: message.parties.sender,
+                    },
+                ));
+            }
+        }
+
         let mut seen_senders: BTreeSet<PartyIndex> = BTreeSet::new();
         for message in received {
             // Validate sender identity before processing (defense-in-depth against misrouting).
@@ -1000,6 +1047,24 @@ impl<C: DklsCurve> Party<C> {
 
         Ok((signature, rec_id))
     }
+}
+
+/// H1 (ToB TOB-SILA-7+8): Fiat-Shamir digest binding the assembled DKG root
+/// (`chain_code`) together with the session identifiers (`session_id`, `sign_id`)
+/// that feed every leak-bearing signing oracle (`mul_sid` / `zero_sid` / `ote_sid`).
+///
+/// Each party broadcasts this digest in phase 1 and every party cross-checks it in
+/// phase 2 *before* running any OT/multiplication step. The DKG only *binds* each
+/// party's aux chain code (commitment-vs-opening) but never cross-verifies the
+/// *assembled* root, and `session_id` enters the keyshare with no agreement check —
+/// so two honest parties left with divergent-but-valid views would otherwise only
+/// discover the disagreement at the leak-bearing phase-2 COTe consistency check and
+/// ban each other (key-destruction). Echoing this digest turns that into an early,
+/// recoverable, identifiable abort. The inputs are public, so the digest leaks
+/// nothing; it is length-delimited via [`tagged_hash`] so the binding is injective.
+#[must_use]
+fn root_agreement_digest(session_id: &[u8], sign_id: &[u8], chain_code: &[u8]) -> HashOutput {
+    tagged_hash(TAG_ROOT_AGREEMENT, &[session_id, sign_id, chain_code])
 }
 
 /// Parses a hex string as a canonical scalar for curve `C` (value must be < curve order n).
@@ -2083,6 +2148,150 @@ mod tests {
 
         assert_eq!(x_coords[0], x_coords[1]);
         (x_coords[0].clone(), broadcasts)
+    }
+
+    /// H1 (ToB TOB-SILA-7+8) setup: a 2-of-2 key, then `diverge` is applied to
+    /// party 2 *before* phase 1 so the two honest parties enter signing with
+    /// different assembled roots (as an equivocating relay/participant at DKG
+    /// would leave them). Returns party 1's phase-1 state and the phase-1
+    /// broadcast routed to party 1.
+    #[allow(clippy::type_complexity)]
+    fn setup_two_party_divergent_root(
+        diverge: impl FnOnce(&mut Party<TestCurve>),
+    ) -> (
+        Vec<Party<TestCurve>>,
+        BTreeMap<PartyIndex, SignData>,
+        BTreeMap<PartyIndex, UniqueKeep1to2<TestCurve>>,
+        BTreeMap<PartyIndex, BTreeMap<PartyIndex, KeepPhase1to2<TestCurve>>>,
+        Vec<TransmitPhase1to2>,
+    ) {
+        let parameters = Parameters {
+            threshold: 2,
+            share_count: 2,
+        };
+        let session_id = rng::get_rng().random::<[u8; crate::utilities::ID_LEN]>();
+        let secret_key = Scalar::random(&mut rng::get_rng());
+        let (mut parties, _) =
+            re_key::<TestCurve>(&parameters, &session_id, &secret_key, None, no_address);
+
+        // The two honest parties end DKG with divergent assembled roots.
+        diverge(&mut parties[1]);
+
+        let sign_id = rng::get_rng().random::<[u8; crate::utilities::ID_LEN]>();
+        let message_to_sign = tagged_hash(b"test-sign", &[b"Message to sign!"]);
+
+        let p1 = PartyIndex::new(1).unwrap();
+        let p2 = PartyIndex::new(2).unwrap();
+        let mut all_data: BTreeMap<PartyIndex, SignData> = BTreeMap::new();
+        all_data.insert(
+            p1,
+            SignData {
+                sign_id: sign_id.to_vec(),
+                counterparties: vec![p2],
+                message_hash: message_to_sign,
+            },
+        );
+        all_data.insert(
+            p2,
+            SignData {
+                sign_id: sign_id.to_vec(),
+                counterparties: vec![p1],
+                message_hash: message_to_sign,
+            },
+        );
+
+        let mut unique_kept_1to2: BTreeMap<PartyIndex, UniqueKeep1to2<TestCurve>> = BTreeMap::new();
+        let mut kept_1to2: BTreeMap<PartyIndex, BTreeMap<PartyIndex, KeepPhase1to2<TestCurve>>> =
+            BTreeMap::new();
+        let mut transmit_1to2: BTreeMap<PartyIndex, Vec<TransmitPhase1to2>> = BTreeMap::new();
+        for pi in [p1, p2] {
+            let (unique_keep, keep, transmit) = parties[(pi.as_u8() - 1) as usize]
+                .sign_phase1(all_data.get(&pi).unwrap())
+                .expect("phase 1 must not abort on a same-length root divergence");
+            unique_kept_1to2.insert(pi, unique_keep);
+            kept_1to2.insert(pi, keep);
+            transmit_1to2.insert(pi, transmit);
+        }
+
+        let received_for_p1: Vec<TransmitPhase1to2> = transmit_1to2
+            .values()
+            .flatten()
+            .filter(|message| message.parties.receiver == p1)
+            .cloned()
+            .collect();
+
+        (
+            parties,
+            all_data,
+            unique_kept_1to2,
+            kept_1to2,
+            received_for_p1,
+        )
+    }
+
+    /// H1 (ToB TOB-SILA-7+8): two honest parties holding a divergent assembled
+    /// root (`chain_code`) must abort signing *recoverably* and *identifiably*
+    /// BEFORE the leak-bearing phase-2 COTe consistency check — never
+    /// `BanCounterparty` an honest party (key-destruction class). DKG commits
+    /// each aux chain code but never cross-verifies the assembled root
+    /// (binding ≠ agreement); the disagreement must be caught by the phase-1
+    /// echo-hash, not by the multiplication ban.
+    #[test]
+    fn test_sign_phase2_divergent_chain_code_aborts_recoverably_not_ban() {
+        let p1 = PartyIndex::new(1).unwrap();
+        let p2 = PartyIndex::new(2).unwrap();
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_for_p1) =
+            setup_two_party_divergent_root(|party| party.derivation_data.chain_code[0] ^= 0xff);
+
+        let abort = parties[0]
+            .sign_phase2(
+                all_data.get(&p1).unwrap(),
+                unique_kept_1to2.get(&p1).unwrap(),
+                kept_1to2.get(&p1).unwrap(),
+                &received_for_p1,
+            )
+            .expect_err("a divergent chain code must abort signing");
+
+        assert_eq!(
+            abort.kind,
+            AbortKind::Recoverable,
+            "an honest party must NOT be banned on a root disagreement; got {:?}",
+            abort.kind
+        );
+        assert!(
+            matches!(
+                abort.reason,
+                AbortReason::RootAgreementMismatch { counterparty } if counterparty == p2
+            ),
+            "expected a RootAgreementMismatch identifying party 2, got {:?}",
+            abort.reason
+        );
+    }
+
+    /// H1 (ToB TOB-SILA-7+8): the same early, recoverable, identifiable abort for
+    /// a divergent `session_id` (also unbound for *agreement* at DKG — L1 only
+    /// checks its length).
+    #[test]
+    fn test_sign_phase2_divergent_session_id_aborts_recoverably_not_ban() {
+        let p1 = PartyIndex::new(1).unwrap();
+        let p2 = PartyIndex::new(2).unwrap();
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_for_p1) =
+            setup_two_party_divergent_root(|party| party.session_id[0] ^= 0xff);
+
+        let abort = parties[0]
+            .sign_phase2(
+                all_data.get(&p1).unwrap(),
+                unique_kept_1to2.get(&p1).unwrap(),
+                kept_1to2.get(&p1).unwrap(),
+                &received_for_p1,
+            )
+            .expect_err("a divergent session_id must abort signing");
+
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(matches!(
+            abort.reason,
+            AbortReason::RootAgreementMismatch { counterparty } if counterparty == p2
+        ));
     }
 
     /// Tests if phase 2 rejects messages from unknown senders.

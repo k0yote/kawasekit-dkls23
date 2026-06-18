@@ -16,6 +16,11 @@ pub const TAG_ENCPROOF_FS: &[u8] = b"dkls23/proofs/enc/fs/v1";
 /// Zero-share fragment derivation oracle.
 pub const TAG_ZERO_SHARE_FRAGMENT: &[u8] = b"dkls23/zero-share/fragment/v1";
 
+/// Signing root-agreement echo oracle (H1 / TOB-SILA-7+8): binds the assembled DKG
+/// root (`chain_code`) and the session identifiers (`session_id` / `sign_id`) so a
+/// cross-party disagreement is an early, recoverable, identifiable abort.
+pub const TAG_ROOT_AGREEMENT: &[u8] = b"dkls23/sign/root-agreement/v1";
+
 /// Base OT hash-to-point oracle.
 pub const TAG_OT_BASE_H: &[u8] = b"dkls23/ot/base/h/v1";
 /// Base OT message derivation oracle.
@@ -54,6 +59,7 @@ pub const ALL_TAGS: &[&[u8]] = &[
     TAG_DLOG_PROOF_COMMITMENT,
     TAG_ENCPROOF_FS,
     TAG_ZERO_SHARE_FRAGMENT,
+    TAG_ROOT_AGREEMENT,
     TAG_OT_BASE_H,
     TAG_OT_BASE_MSG,
     TAG_OTE_PRG,
