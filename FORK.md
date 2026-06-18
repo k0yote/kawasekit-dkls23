@@ -107,6 +107,30 @@ protocol math is byte-identical). It produced **four pre-paid-audit fixes**, all
 Still-open findings from this round (not yet landed; tracked in issue #13): **M3** (fast-refresh consistency
 test), **M5** (supply-chain runbook + yanked-crate check), **M6** (`sign_phase4` hex panic), **L1–L4** (polish).
 
+## ToB-methodology review round
+
+A third pass walked all 15 TOB-SILA classes (Trail of Bits' Silent Shard methodology) against the core —
+recorded in `docs/audit-tob-methodology-review.md`, tracked as GitHub issues `[ToB-H1..L4]`. It confirmed the
+fork had **already converged on ToB's two High findings** (selective-abort = 2nd-round H1; setup-threshold =
+M2) and surfaced **one genuinely new gap** plus pre-audit hardening.
+
+> Finding IDs **collide by letter** with both earlier rounds — a **third separate set** (`[ToB-*]`, the
+> GitHub issues). This round's **H1** is unrelated to the first/second-round H1s.
+
+| Finding (ToB round) | What | Files | PR | Drop-in? |
+|---|---|---|---|---|
+| **H1** `[ssid]` `[abort]` | Cross-party **agreement** on the assembled DKG root (`chain_code`) + session ids was unverified in-core (DKG *binds* each aux chain code but never cross-verifies the *assembled* root; `session_id` enters the keyshare unchecked) → two honest parties left with divergent-but-valid views would **ban each other** at the leak-bearing phase-2 COTe check (key-destruction). Fix: `sign_phase1` broadcasts a Fiat-Shamir echo `H(session_id ‖ sign_id ‖ chain_code)`; `sign_phase2` constant-time cross-checks it **before** any leak-bearing mul → `RootAgreementMismatch` (recoverable + identifiable). | `protocols/signing.rs`, `protocols.rs`, `utilities/oracle_tags.rs` | #38 | yes |
+
+> **Scope (honesty):** the in-core echo closes the **honest-divergence** case (a passive relay delivering
+> different-but-each-valid views). A **malicious** equivocator that forges a matching echo while signing under
+> a different root still bans at phase 2 — full equivocation resistance is the authenticated-broadcast /
+> transport layer's responsibility (TOB-SILA-6/9/14, carried to the backend `kawasekit-mpc-2p`).
+
+Still-open ToB items (tracked as issues `[ToB-M1..L4]`): **M1** (residual const-time branches), **M2** (early
+protocol-version-mismatch abort), **L1** (256-vs-128 doc), **L2** (γ_v / base-OT `s≠0` negative tests),
+**L3** (`cargo-llvm-cov` + `dylint` in CI), **L4** (`zip_eq` at the COTe fold). The OT/VOLE multiplication
+soundness and all *measured* side-channel work stay **reserved for the paid audit**.
+
 ## Frozen release-candidate crypto versions
 
 DKLs23 is built on the `k256` / `elliptic-curve` **0.14 release-candidate** line. There is **no stable `k256`
