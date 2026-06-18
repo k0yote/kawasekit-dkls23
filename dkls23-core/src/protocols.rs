@@ -367,6 +367,16 @@ pub enum AbortReason {
         party: PartyIndex,
     },
 
+    /// H1 (ToB TOB-SILA-7+8): a counterparty's phase-1 echo of the assembled DKG root
+    /// (`chain_code`) and the session identifiers (`session_id` / `sign_id`) disagrees
+    /// with ours. Recoverable and identifiable: the named party holds a divergent root
+    /// view (e.g. an equivocating relay/participant — DKG binds each aux chain code but
+    /// never cross-verifies the *assembled* root), so signing aborts *before* the
+    /// leak-bearing multiplication check rather than banning an honest party.
+    RootAgreementMismatch {
+        counterparty: PartyIndex,
+    },
+
     // --- Session state machine ---
     PhaseCalledOutOfOrder {
         phase: String,
@@ -458,6 +468,12 @@ impl fmt::Display for AbortReason {
             }
             Self::ChainCodeCommitmentFailed { party } => {
                 write!(f, "chain code commitment failed for party {party}")
+            }
+            Self::RootAgreementMismatch { counterparty } => {
+                write!(
+                    f,
+                    "root (chain-code/session-id) disagreement with party {counterparty}"
+                )
             }
             Self::PhaseCalledOutOfOrder { phase } => {
                 write!(f, "{phase}")

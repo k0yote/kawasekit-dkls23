@@ -17,6 +17,10 @@
 
 **Verdict: `Value-gating-adjacent — one High key-destruction-class gap (H1) to close (or justify) before the paid audit; no key-extraction defect found in the core; third-party audit still MANDATORY.`**
 
+> **Update (2026-06-18):** the one High gap, **H1**, is now **RESOLVED** (PR #38, fix approach 1 — in-core
+> Fiat-Shamir root-agreement echo). See §3 H1 for the resolution note. The point-in-time analysis below is
+> kept as-written; the third-party crypto audit remains MANDATORY and is **not** cleared by this fix.
+
 Walking all 15 TOB-SILA classes + the side-channel and RVOLE appendices against the core, the fork's own
 second-round hardening had **already converged on ToB's two High findings** — selective-abort (TOB-SILA-12 =
 the fork's H1) and setup-threshold (TOB-SILA-15 = M2) are both **COVERED** — and on most of the Medium/Info
@@ -52,7 +56,7 @@ justify before the paid audit.
 
 | ID | Severity | Class | Title | Est. effort | Value-gating |
 |---|---|---|---|---|---|
-| H1 | 🟠 High | `[ssid]` `[abort]` | Chain-code / session-id cross-party agreement unverified → honest-party ban (TOB-SILA-7+8) | 1–2d | strongly rec. (library-level) |
+| H1 ✅ | 🟠 High | `[ssid]` `[abort]` | Chain-code / session-id cross-party agreement unverified → honest-party ban (TOB-SILA-7+8) — **RESOLVED PR #38** | 1–2d | strongly rec. (library-level) |
 | M1 | 🟡 Medium | `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D) | 1d | pre-audit |
 | M2 | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) | 0.5d | pre-audit |
 | L1 | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) | 0.25d | polish (doc) |
@@ -71,6 +75,17 @@ argument, and all *measured* side-channel work.
 ## §3. Per-finding detail
 
 ### H1. Chain-code / session-id cross-party agreement is unverified in-core `[ssid]` `[abort]`
+
+> **✅ RESOLVED (2026-06-18, PR #38, fix approach 1).** `sign_phase1` now broadcasts a Fiat-Shamir echo
+> `tagged_hash(TAG_ROOT_AGREEMENT, [session_id ‖ sign_id ‖ chain_code])` on `TransmitPhase1to2`, and
+> `sign_phase2` constant-time cross-checks every counterparty's echo against its own **before** any
+> leak-bearing OT/multiplication → `AbortReason::RootAgreementMismatch` (**recoverable + identifiable**,
+> not `BanCounterparty`). Two negative tests drive divergent `chain_code` / `session_id` and assert the
+> recoverable abort fires before the phase-2 ban. This closes the **honest-divergence** case; a *malicious*
+> equivocator forging a matching echo while signing under a different root still bans at phase 2 — full
+> equivocation resistance remains the authenticated-broadcast / transport layer's job (TOB-SILA-6/9/14,
+> backend). The third-party crypto audit remains MANDATORY. *(The line numbers below are as-of-review and
+> predate the fix; current locations are in `docs/audit-context.md` §3.7.)*
 
 **Problem.** The root chain code is a committed-XOR: each party commits then reveals its `aux_chain_code`
 (`dkg.rs:552-553`, `:709-713`), and every party verifies *each counterparty's* commitment-vs-opening and XORs
