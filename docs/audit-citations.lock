@@ -84,11 +84,13 @@ dkls23-core/src/utilities/multiplication.rs:359	}
 dkls23-core/src/utilities/multiplication.rs:476	// L4 (self-audit): both parties derive `public_gadget` independently from the same
 dkls23-core/src/utilities/multiplication.rs:480	let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
 dkls23-core/src/utilities/multiplication.rs:489	}
-dkls23-core/src/utilities/multiplication.rs:571	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
-dkls23-core/src/utilities/multiplication.rs:582	}
-dkls23-core/src/utilities/multiplication.rs:686	if !bool::from(data_received.verify_r.ct_eq(&expected_verify_r)) {
-dkls23-core/src/utilities/multiplication.rs:687	return Err(ErrorMul::new(
-dkls23-core/src/utilities/multiplication.rs:875	assert_eq!(sum, sender_input[i as usize] * receiver_random);
+dkls23-core/src/utilities/multiplication.rs:537	b = C::Scalar::conditional_select(
+dkls23-core/src/utilities/multiplication.rs:575	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
+dkls23-core/src/utilities/multiplication.rs:586	}
+dkls23-core/src/utilities/multiplication.rs:674	let entry = C::Scalar::conditional_select(
+dkls23-core/src/utilities/multiplication.rs:693	if !bool::from(data_received.verify_r.ct_eq(&expected_verify_r)) {
+dkls23-core/src/utilities/multiplication.rs:694	return Err(ErrorMul::new(
+dkls23-core/src/utilities/multiplication.rs:882	assert_eq!(sum, sender_input[i as usize] * receiver_random);
 dkls23-core/src/utilities/ot.rs:17	pub enum OtErrorKind {
 dkls23-core/src/utilities/ot.rs:49	}
 dkls23-core/src/utilities/ot/base.rs:80	let mut s = <C::Scalar as Field>::ZERO;
@@ -108,12 +110,13 @@ dkls23-core/src/utilities/ot/extension.rs:365	return Err(ErrorOT::consistency(
 dkls23-core/src/utilities/ot/extension.rs:368	}
 dkls23-core/src/utilities/ot/extension.rs:421	TAG_OTE_RANDOMIZE,
 dkls23-core/src/utilities/ot/extension.rs:429	v1.push(tagged_hash_as_scalar::<C>(
-dkls23-core/src/utilities/ot/extension.rs:832	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
-dkls23-core/src/utilities/ot/extension.rs:888	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
-dkls23-core/src/utilities/ot/extension.rs:917	let bit = (a[j as usize] >> k) & 1;
-dkls23-core/src/utilities/ot/extension.rs:921	}
-dkls23-core/src/utilities/ot/extension.rs:974	}
-dkls23-core/src/utilities/ot/extension.rs:1065	#[test]
+dkls23-core/src/utilities/ot/extension.rs:808	let t_b_j = C::Scalar::conditional_select(
+dkls23-core/src/utilities/ot/extension.rs:838	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
+dkls23-core/src/utilities/ot/extension.rs:894	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
+dkls23-core/src/utilities/ot/extension.rs:923	let bit = (a[j as usize] >> k) & 1;
+dkls23-core/src/utilities/ot/extension.rs:927	}
+dkls23-core/src/utilities/ot/extension.rs:980	}
+dkls23-core/src/utilities/ot/extension.rs:1071	#[test]
 dkls23-core/src/utilities/proofs.rs:233	let mut states: Zeroizing<Vec<C::Scalar>> = Zeroizing::new(Vec::with_capacity(R as usize));
 dkls23-core/src/utilities/proofs.rs:374	pub fn verify(proof: &DLogProof<C>, session_id: &[u8]) -> bool {
 dkls23-core/src/utilities/proofs.rs:387	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
