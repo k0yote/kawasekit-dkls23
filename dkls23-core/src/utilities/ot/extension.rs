@@ -41,7 +41,7 @@ use rand::RngExt;
 use serde::de::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserializer, Serializer};
-use subtle::ConstantTimeEq;
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::curve::DklsCurve;
@@ -800,10 +800,16 @@ impl OTEReceiver {
 
             let mut t_b: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
             for j in 0..BATCH_SIZE {
-                let mut t_b_j = -v[j as usize];
-                if choice_bits[j as usize] {
-                    t_b_j = tau[j as usize] + t_b_j;
-                }
+                let t_b_j = -v[j as usize];
+                // Constant-time (M1, self-audit / ToB-M1): `choice_bits` are the receiver's
+                // secret OT choices. Compute both branches and select by `Choice` instead of
+                // branching, so the chosen bit does not leak via timing. Best-effort; the
+                // measured side-channel verdict stays paid-audit-reserved.
+                let t_b_j = C::Scalar::conditional_select(
+                    &t_b_j,
+                    &(tau[j as usize] + t_b_j),
+                    Choice::from(u8::from(choice_bits[j as usize])),
+                );
                 t_b.push(t_b_j);
             }
 
