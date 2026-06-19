@@ -3,14 +3,15 @@
 # Re-run --update after intentionally changing a citation or a cited source line.
 dkls23-core/src/lib.rs:14	#[cfg(all(not(test), feature = "insecure-rng"))]
 dkls23-core/src/lib.rs:25	);
+dkls23-core/src/lib.rs:55	pub const PROTOCOL_VERSION: u16 = 1;
 dkls23-core/src/protocols.rs:23	#[cfg(any(test, feature = "trusted-dealer-import"))]
 dkls23-core/src/protocols.rs:62	pub fn new(value: u8) -> Result<Self, InvalidPartyIndex> {
 dkls23-core/src/protocols.rs:117	impl TryFrom<ParametersRaw> for Parameters {
 dkls23-core/src/protocols.rs:122	}
 dkls23-core/src/protocols.rs:174	impl<C: DklsCurve> Zeroize for Party<C> {
 dkls23-core/src/protocols.rs:198	}
-dkls23-core/src/protocols.rs:484	}
-dkls23-core/src/protocols.rs:499	#[must_use]
+dkls23-core/src/protocols.rs:502	}
+dkls23-core/src/protocols.rs:517	#[must_use]
 dkls23-core/src/protocols/derivation.rs:105	pub fn child_tweak(
 dkls23-core/src/protocols/derivation.rs:129	if tweak.to_repr() != *field_bytes {
 dkls23-core/src/protocols/derivation.rs:147	}
@@ -42,38 +43,40 @@ dkls23-core/src/protocols/refresh.rs:1449	fn test_refresh_phase4_rejects_trivial
 dkls23-core/src/protocols/refresh.rs:1540	fn test_corrupted_fast_refresh_is_banned_at_next_signing() {
 dkls23-core/src/protocols/sign_session.rs:74	pub fn phase4(mut self, received: &[Broadcast3to4<C>]) -> Result<EcdsaSignature, Abort> {
 dkls23-core/src/protocols/sign_session.rs:234	// M4 (self-audit): the SignSession API normalizes to canonical low-S (EIP-2 / BIP-62),
-dkls23-core/src/protocols/signing.rs:272	if self.session_id.len() != crate::utilities::ID_LEN
-dkls23-core/src/protocols/signing.rs:275	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:279	}
-dkls23-core/src/protocols/signing.rs:338	let instance_key = C::Scalar::random(&mut rng::get_rng());
-dkls23-core/src/protocols/signing.rs:339	let inversion_mask = C::Scalar::random(&mut rng::get_rng());
-dkls23-core/src/protocols/signing.rs:354	let root_digest = root_agreement_digest(
-dkls23-core/src/protocols/signing.rs:393	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:430	let zero_sid = [
-dkls23-core/src/protocols/signing.rs:436	.concat();
-dkls23-core/src/protocols/signing.rs:544	let our_root_digest = root_agreement_digest(
-dkls23-core/src/protocols/signing.rs:551	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:556	));
-dkls23-core/src/protocols/signing.rs:627	return Err(match error.kind {
-dkls23-core/src/protocols/signing.rs:628	MulErrorKind::ConsistencyFailure => Abort::ban(
-dkls23-core/src/protocols/signing.rs:643	});
-dkls23-core/src/protocols/signing.rs:824	})?;
-dkls23-core/src/protocols/signing.rs:835	return Err(match error.kind {
-dkls23-core/src/protocols/signing.rs:836	MulErrorKind::ConsistencyFailure => Abort::ban(
-dkls23-core/src/protocols/signing.rs:851	});
-dkls23-core/src/protocols/signing.rs:864	return Err(Abort::ban(
-dkls23-core/src/protocols/signing.rs:876	return Err(Abort::ban(
-dkls23-core/src/protocols/signing.rs:885	(C::ProjectivePoint::from(expected_public_key) + message.public_share).to_affine();
-dkls23-core/src/protocols/signing.rs:954	pub fn sign_phase4(
-dkls23-core/src/protocols/signing.rs:970	let denominator_inverse = match Option::<C::Scalar>::from(denominator.invert()) {
-dkls23-core/src/protocols/signing.rs:973	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:985	{
-dkls23-core/src/protocols/signing.rs:988	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:993	}
-dkls23-core/src/protocols/signing.rs:995	let mut s = numerator * denominator_inverse;
-dkls23-core/src/protocols/signing.rs:1006	let verification =
-dkls23-core/src/protocols/signing.rs:1046	let rec_id = (is_y_odd as u8) | ((is_x_reduced as u8) << 1);
-dkls23-core/src/protocols/signing.rs:1048	Ok((signature, rec_id))
+dkls23-core/src/protocols/signing.rs:276	if self.session_id.len() != crate::utilities::ID_LEN
+dkls23-core/src/protocols/signing.rs:279	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:283	}
+dkls23-core/src/protocols/signing.rs:342	let instance_key = C::Scalar::random(&mut rng::get_rng());
+dkls23-core/src/protocols/signing.rs:343	let inversion_mask = C::Scalar::random(&mut rng::get_rng());
+dkls23-core/src/protocols/signing.rs:358	let root_digest = root_agreement_digest(
+dkls23-core/src/protocols/signing.rs:397	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:422	protocol_version: crate::PROTOCOL_VERSION,
+dkls23-core/src/protocols/signing.rs:435	let zero_sid = [
+dkls23-core/src/protocols/signing.rs:441	.concat();
+dkls23-core/src/protocols/signing.rs:545	if message.protocol_version != crate::PROTOCOL_VERSION {
+dkls23-core/src/protocols/signing.rs:566	let our_root_digest = root_agreement_digest(
+dkls23-core/src/protocols/signing.rs:573	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:578	));
+dkls23-core/src/protocols/signing.rs:649	return Err(match error.kind {
+dkls23-core/src/protocols/signing.rs:650	MulErrorKind::ConsistencyFailure => Abort::ban(
+dkls23-core/src/protocols/signing.rs:665	});
+dkls23-core/src/protocols/signing.rs:846	})?;
+dkls23-core/src/protocols/signing.rs:857	return Err(match error.kind {
+dkls23-core/src/protocols/signing.rs:858	MulErrorKind::ConsistencyFailure => Abort::ban(
+dkls23-core/src/protocols/signing.rs:873	});
+dkls23-core/src/protocols/signing.rs:886	return Err(Abort::ban(
+dkls23-core/src/protocols/signing.rs:898	return Err(Abort::ban(
+dkls23-core/src/protocols/signing.rs:907	(C::ProjectivePoint::from(expected_public_key) + message.public_share).to_affine();
+dkls23-core/src/protocols/signing.rs:976	pub fn sign_phase4(
+dkls23-core/src/protocols/signing.rs:992	let denominator_inverse = match Option::<C::Scalar>::from(denominator.invert()) {
+dkls23-core/src/protocols/signing.rs:995	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:1007	{
+dkls23-core/src/protocols/signing.rs:1010	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:1015	}
+dkls23-core/src/protocols/signing.rs:1017	let mut s = numerator * denominator_inverse;
+dkls23-core/src/protocols/signing.rs:1028	let verification =
+dkls23-core/src/protocols/signing.rs:1068	let rec_id = (is_y_odd as u8) | ((is_x_reduced as u8) << 1);
+dkls23-core/src/protocols/signing.rs:1070	Ok((signature, rec_id))
 dkls23-core/src/utilities/multiplication.rs:126	pub enum MulErrorKind {
 dkls23-core/src/utilities/multiplication.rs:173	}
 dkls23-core/src/utilities/multiplication.rs:217	// L4 (self-audit): both parties derive `public_gadget` independently from the same

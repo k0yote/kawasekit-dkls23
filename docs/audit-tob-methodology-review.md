@@ -58,7 +58,7 @@ justify before the paid audit.
 |---|---|---|---|---|---|
 | H1 ✅ | 🟠 High | `[ssid]` `[abort]` | Chain-code / session-id cross-party agreement unverified → honest-party ban (TOB-SILA-7+8) — **RESOLVED PR #38** | 1–2d | strongly rec. (library-level) |
 | M1 ✅ | 🟡 Medium | `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D) — **RESOLVED PR #40** | 1d | pre-audit |
-| M2 | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) | 0.5d | pre-audit |
+| M2 ✅ | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) — **RESOLVED PR #41** | 0.5d | pre-audit |
 | L1 | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) | 0.25d | polish (doc) |
 | L2 | 🟢 Low | `[validation]` | Missing negative tests: γ_v ban + base-OT `s≠0`; no property-based testing | 0.5d | pre-audit |
 | L3 | 🟢 Low | `[supply-chain]` | `cargo-llvm-cov` + `dylint` not in CI (ToB's tooling) | 0.25d | polish |
@@ -167,6 +167,13 @@ do not commit — leave the diff for PR review.
 ````
 
 ### M2. No early protocol-version-mismatch abort `[ssid]`
+
+> **✅ RESOLVED (2026-06-20, PR #41).** Added a crate `PROTOCOL_VERSION` constant (`lib.rs`) stamped into
+> the signing phase-1 broadcast (`TransmitPhase1to2.protocol_version`) and cross-checked in `sign_phase2`
+> **before** any leak-bearing step → `AbortReason::ProtocolVersionMismatch { counterparty, expected, got }`
+> (recoverable, identifiable). A negative test drives a mismatched version and asserts the early abort.
+> Bound at the **signing** entry (the relevant path for the post-security-fix scenario; DKG coverage can
+> follow). Defense-in-depth, not key-affecting. *(Current locations in `docs/audit-context.md` §3.7.)*
 
 **Problem.** Oracle tags are versioned (`b".../v1"`) and centralized (`oracle_tags.rs:7-69`, uniqueness-tested),
 but there is **no runtime protocol-version field / handshake**. A version/tag mismatch between parties
