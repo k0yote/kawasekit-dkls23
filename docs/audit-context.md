@@ -75,7 +75,7 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 | ID | Class | What | Where (current lines) |
 |----|-------|------|------|
 | **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:17–49`, `multiplication.rs:126–173`, `signing.rs:627–643/835–851` |
-| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:917–921` |
+| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:923–927` |
 | **M2** | `[secret-hygiene]` | Zeroize the EncProof/CP witness-bearing commitment nonce | `proofs.rs:805/876` |
 | **M3** | `[keygen]` | Fast-refresh trivial-share guard + deferred-detection round-trip tests | `refresh.rs:1449/1540` |
 | **M4** | `[validation]` | `SignSession` finalizer always emits canonical low-S | `sign_session.rs:74/234` |
@@ -128,10 +128,14 @@ in `Party` and reused every signing session** (forced-reuse, `OT_WIDTH=4`).
 **THE consistency check** (`OTESender::run`, `:359–368`): constant-time GF(2²⁰⁸) fold over KAPPA columns;
 mismatch → `ErrorOT::consistency("Receiver cheated in OTE")` (kind `OtErrorKind::ConsistencyFailure`) →
 **ban trigger** (H1, 2nd round). Comparison is constant-time (`ct_eq` fold, `:359–362`); **`field_mul`
-(`:888–974`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:917–921`, M1, 2nd
-round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1065`).
+(`:894–980`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:923–927`, M1, 2nd
+round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1071`).
+**ToB-M1:** the three residual secret-choice-bit branches beyond `field_mul` are now also constant-time —
+`t_b` (`extension.rs:808`), the gadget fold `b` (`multiplication.rs:537`), and the `verify_u` entry
+(`multiplication.rs:674`) each compute both branches and `Choice`-select instead of `if bit { … }`
+(measured-timing verdict stays paid-audit-reserved).
 Session separation: `session_id` threaded into PRG (`:268`), chi (`:315/318`), randomize (`:421/429`).
-`cut_and_transpose` (`:832`) ported from Coinbase kryptology.
+`cut_and_transpose` (`:838`) ported from Coinbase kryptology.
 
 ### 3.3 ZK Proofs — `utilities/proofs.rs` (1275)
 - **DLog / Fischlin** (R=64, L=4, T=32): `prove` holds 64 nonces in `Zeroizing<Vec>` (H1, `:233`).
@@ -150,9 +154,9 @@ in `Zeroizing` (`:805`, deref `&*` at `:876`), mirroring `DLogProof::prove`. *Op
 DKLs19 Protocol 1. `L=2`, `OT_WIDTH=4`. `MulSender{public_gadget, ote_sender}` / `MulReceiver{public_gadget,
 ote_receiver}` — persisted in `Party`, reused every session. Correlation **I-RVOLE**:
 `output_A[i] + output_B[i] == input[i]·b`.
-**THE verify_r consistency check** (`run_phase2`, `:686` `ct_eq`) → **ban trigger** (`ErrorMul` carries
-`MulErrorKind`; this raises `ConsistencyFailure`, `:687`). `chi_tilde/chi_hat`
-derived by Fiat-Shamir from the receiver's transcript (`:348–359` sender ≡ `:571–582` receiver).
+**THE verify_r consistency check** (`run_phase2`, `:693` `ct_eq`) → **ban trigger** (`ErrorMul` carries
+`MulErrorKind`; this raises `ConsistencyFailure`, `:694`). `chi_tilde/chi_hat`
+derived by Fiat-Shamir from the receiver's transcript (`:348–359` sender ≡ `:575–586` receiver).
 `gamma_sender` is **not** independently authenticated here — signing adds the γ_u/γ_v cross-check.
 **L4 (2nd round, documented):** `public_gadget` equality across parties is **not asserted at runtime**;
 `tau` is not authenticated by OTE — both are caught downstream by `verify_r`.
@@ -254,7 +258,7 @@ recovery_id:u8}` is a public value type, no zeroize (signature is public).
 
 **Correctness**
 - **I-KEYGEN** — group key = Lagrange-in-exponent of fragments; every contiguous `t`-window must agree (`dkg.rs:411–453` → `PolynomialInconsistency`); `verifying_share[i] == poly_point_i·G`.
-- **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:875`).
+- **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:882`).
 - **I-ZEROSHARE** — `Σ ζ_i == 0` over the signer set (`zero_shares.rs:79,123–127`).
 - **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:995`); re-verified (`:1006`).
 - **I-DERIVE** — same public `tweak` added to every share shifts `sk→sk+tweak`, `pk→pk+tweak·G` (`derivation.rs:172–174,349–353`).
@@ -296,7 +300,7 @@ Verified distribution: **signing = 4 bans; DKG = 0; refresh = 0.**
 (`signing.rs:627–643/835–851`) and bans **only** on `ConsistencyFailure`. The two layers carry *inverted*
 `::new` defaults — `ErrorMul::new`→`ConsistencyFailure` (ban-safe), `ErrorOT::new`→`MalformedMessage` —
 reconciled by `ErrorMul::from_ot` propagating the OT kind 1:1. The two leak-bearing roots: mul `verify_r`
-(`multiplication.rs:687`) and the COTe consistency fold (`extension.rs:365`). A malformed-*dimension*
+(`multiplication.rs:694`) and the COTe consistency fold (`extension.rs:365`). A malformed-*dimension*
 message is now **recoverable**, not a ban.
 
 ---
@@ -359,7 +363,7 @@ Ranked by concentration of subtle invariants × attacker reachability:
 | DKG / refresh bans | `grep -c Abort::ban` | 0 / 0 ✓ |
 | Ban is kind-aware (H1) | read `signing.rs:627–643/835–851` | `match error.kind` ✓ |
 | Error `kind` machinery (H1) | read `ot.rs:17–49`, `multiplication.rs:126–173` | `OtErrorKind`/`MulErrorKind` + `from_ot` 1:1 ✓ |
-| `field_mul` constant-time (M1) | read `extension.rs:917–921` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
+| `field_mul` constant-time (M1) | read `extension.rs:923–927` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
 | EncProof nonce zeroized (M2) | `grep Zeroizing proofs.rs` | `:805` (deref `:876`) ✓ |
 | SignSession low-S default (M4) | read `sign_session.rs:74/234` | always `!s.is_high()` ✓ |
 | M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:988` (after `ZeroDenominator` `:973`) ✓ |

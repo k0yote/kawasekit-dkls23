@@ -9,7 +9,7 @@
 
 use rustcrypto_ff::Field;
 use std::marker::PhantomData;
-use subtle::ConstantTimeEq;
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::curve::DklsCurve;
@@ -532,9 +532,13 @@ impl<C: DklsCurve> MulReceiver<C> {
         let mut b = <C::Scalar as Field>::ZERO;
         for i in 0..BATCH_SIZE {
             let current_bit: bool = rng::get_rng().random();
-            if current_bit {
-                b += &self.public_gadget[i as usize];
-            }
+            // Constant-time (M1, self-audit / ToB-M1): `current_bit` is a secret OT choice bit.
+            // Add the gadget entry via a `Choice`-selected value instead of branching on it.
+            b = C::Scalar::conditional_select(
+                &b,
+                &(b + self.public_gadget[i as usize]),
+                Choice::from(u8::from(current_bit)),
+            );
             choice_bits.push(current_bit);
         }
 
@@ -663,12 +667,15 @@ impl<C: DklsCurve> MulReceiver<C> {
             let mut entries_as_bytes: Vec<Vec<u8>> = Vec::with_capacity(BATCH_SIZE as usize);
             for j in 0..BATCH_SIZE {
                 // The entry depends on the choice bits.
-                let mut entry = (-(data_kept.chi_tilde[i as usize]
-                    * z_tilde[i as usize][j as usize]))
+                let entry = (-(data_kept.chi_tilde[i as usize] * z_tilde[i as usize][j as usize]))
                     - (data_kept.chi_hat[i as usize] * z_hat[i as usize][j as usize]);
-                if data_kept.choice_bits[j as usize] {
-                    entry += &data_received.verify_u[i as usize];
-                }
+                // Constant-time (M1, self-audit / ToB-M1): `choice_bits` are secret OT choices;
+                // select the verify_u-adjusted entry by `Choice` rather than branching on the bit.
+                let entry = C::Scalar::conditional_select(
+                    &entry,
+                    &(entry + data_received.verify_u[i as usize]),
+                    Choice::from(u8::from(data_kept.choice_bits[j as usize])),
+                );
 
                 let entry_as_bytes = scalar_to_bytes::<C>(&entry);
                 entries_as_bytes.push(entry_as_bytes);

@@ -57,7 +57,7 @@ justify before the paid audit.
 | ID | Severity | Class | Title | Est. effort | Value-gating |
 |---|---|---|---|---|---|
 | H1 ✅ | 🟠 High | `[ssid]` `[abort]` | Chain-code / session-id cross-party agreement unverified → honest-party ban (TOB-SILA-7+8) — **RESOLVED PR #38** | 1–2d | strongly rec. (library-level) |
-| M1 | 🟡 Medium | `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D) | 1d | pre-audit |
+| M1 ✅ | 🟡 Medium | `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D) — **RESOLVED PR #40** | 1d | pre-audit |
 | M2 | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) | 0.5d | pre-audit |
 | L1 | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) | 0.25d | polish (doc) |
 | L2 | 🟢 Low | `[validation]` | Missing negative tests: γ_v ban + base-OT `s≠0`; no property-based testing | 0.5d | pre-audit |
@@ -134,6 +134,12 @@ do not commit — leave the diff for PR review.
 ````
 
 ### M1. Residual secret-choice-bit branches beyond `field_mul` `[const-time]`
+
+> **✅ RESOLVED (2026-06-20, PR #40).** All three secret-choice-bit branches now compute both sides and
+> `subtle::ConditionallySelectable::conditional_select` by a `Choice` derived from the bit — no
+> data-dependent branch remains: `extension.rs` `t_b`, `multiplication.rs` gadget-fold `b`, and the
+> `verify_u` entry. Full lib suite green (behaviour unchanged). The *measured*-timing verdict stays
+> paid-audit-reserved. *(Line numbers below are as-of-review; current locations in `docs/audit-context.md` §3.2.)*
 
 **Problem.** M1 made the GF(2²⁰⁸) `field_mul` comb branch-free (`extension.rs:917-921`, verified). But three
 production paths still branch on the receiver's **secret OT choice bits**: `extension.rs:804`
