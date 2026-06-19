@@ -74,14 +74,14 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 
 | ID | Class | What | Where (current lines) |
 |----|-------|------|------|
-| **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:17–49`, `multiplication.rs:126–173`, `signing.rs:627–643/835–851` |
+| **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:17–49`, `multiplication.rs:126–173`, `signing.rs:649–665/857–873` |
 | **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:923–927` |
 | **M2** | `[secret-hygiene]` | Zeroize the EncProof/CP witness-bearing commitment nonce | `proofs.rs:805/876` |
 | **M3** | `[keygen]` | Fast-refresh trivial-share guard + deferred-detection round-trip tests | `refresh.rs:1449/1540` |
 | **M4** | `[validation]` | `SignSession` finalizer always emits canonical low-S | `sign_session.rs:74/234` |
 | **M5** | `[supply-chain]` | Yanked-crate / advisory runbook step (docs only) | `FORK.md`, `docs/security.md` |
-| **M6** | `[rust-safety]` | Up-front `x_coord` hex validation in `sign_phase4` (typed abort, not `.expect`) | `signing.rs:985–993` |
-| **L1** | `[ssid]` | Enforce canonical `ID_LEN`=32 `session_id`/`sign_id` at signing entry | `signing.rs:272–279` |
+| **M6** | `[rust-safety]` | Up-front `x_coord` hex validation in `sign_phase4` (typed abort, not `.expect`) | `signing.rs:1007–1015` |
+| **L1** | `[ssid]` | Enforce canonical `ID_LEN`=32 `session_id`/`sign_id` at signing entry | `signing.rs:276–283` |
 | **L3** | `[rust-safety]` | Document the Fischlin `.expect` as an RNG fail-stop (not attacker-reachable) | `dkg.rs:349`, `base.rs:85` |
 | **L4** | `[OT]` | Document public-gadget agreement (a mismatch is caught downstream by `verify_r`) | `multiplication.rs:217/476` |
 
@@ -102,7 +102,7 @@ byte-identical to upstream; the fork delta remains additive (guards, error tags,
 - **`PublicKeyPackage<C>`** — group verifying key + per-party verifying shares + parameters.
 - **`AbortKind`** — `Recoverable` | **`BanCounterparty(PartyIndex)`**. The ban variant is the central
   security mechanism (see §6). **`Abort{index, kind, reason}`** with `AbortReason` (`#[non_exhaustive]`,
-  machine-readable). `Abort::recoverable` / `Abort::ban` constructors at `:484` / `:499`.
+  machine-readable). `Abort::recoverable` / `Abort::ban` constructors at `:502` / `:517`.
 
 ---
 
@@ -165,7 +165,7 @@ derived by Fiat-Shamir from the receiver's transcript (`:348–359` sender ≡ `
 Functionality 3.4. `SeedPair{lowest_index, index_counterparty, seed}`, `ZeroShare{seeds}` — zeroized.
 **Sign rule** (`:79`, `:123–127`): `lowest_index = (index_party ≤ index_counterparty)`; **lower index
 SUBTRACTS, higher ADDS** → pairwise cancel → **I-ZEROSHARE** `Σ ζ_i = 0`. Seeds XOR-combined (symmetric).
-`zero_sid` composition (signing `:430–436`): `"Zero shares protocol" ‖ session_id ‖ sign_id ‖ chain_code`
+`zero_sid` composition (signing `:435–441`): `"Zero shares protocol" ‖ session_id ‖ sign_id ‖ chain_code`
 — **party indices deliberately omitted** (they enter via the per-pair seed). Commit-then-reveal with
 `verify_seed` → `ZeroShareDecommitFailed` (recoverable).
 
@@ -179,20 +179,20 @@ trivial-PK (`pk ∉ {identity, generator}`) + trivial-share (`poly_point ∉ {0,
 OT state, so the ban discipline does not apply yet (explicit comment `:1020–1021`).
 
 ### 3.7 Signing — `protocols/signing.rs` (2440) — the linchpin
-DKLs23 Protocol 3.6, 4 phases. Nonce `k` and inversion mask `φ` sampled (`:338–339`); `R_i = k·G` committed.
+DKLs23 Protocol 3.6, 4 phases. Nonce `k` and inversion mask `φ` sampled (`:342–343`); `R_i = k·G` committed.
 The **deferred-inversion trick**: `k⁻¹` is never computed on a secret — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`
-materializes only on public aggregated scalars (`:995`), then independently re-verified
-(`verify_ecdsa_signature`, `:1006`). Recovery id = 2-bit (y-parity | x-reduced) (`:1046`) — **not**
+materializes only on public aggregated scalars (`:1017`), then independently re-verified
+(`verify_ecdsa_signature`, `:1028`). Recovery id = 2-bit (y-parity | x-reduced) (`:1068`) — **not**
 EIP-155 `v`. Two 2nd-round entry guards: **L1** — `session_id`/`sign_id` must be `ID_LEN`=32 at
-`sign_phase1` entry (`:272–279` → `MalformedSessionId`, recoverable); **M6** — `x_coord` hex re-validated
-up front in `sign_phase4` (`:985–993` → `InvalidXCoordinateHex`, recoverable), placed **after** the
-zero-denominator check (`:970`). Low-s: `Party::sign_phase4` keeps the `normalize` flag, but
+`sign_phase1` entry (`:276–283` → `MalformedSessionId`, recoverable); **M6** — `x_coord` hex re-validated
+up front in `sign_phase4` (`:1007–1015` → `InvalidXCoordinateHex`, recoverable), placed **after** the
+zero-denominator check (`:992`). Low-s: `Party::sign_phase4` keeps the `normalize` flag, but
 `SignSession::phase4` **always** requests canonical low-S (M4; asserted `!s.is_high()`, `sign_session.rs:234`).
 
 **ToB-H1** (chain-code / session-id cross-party *agreement*) — `sign_phase1` broadcasts a Fiat-Shamir
 echo `root_digest = tagged_hash(TAG_ROOT_AGREEMENT, [session_id ‖ sign_id ‖ chain_code])` on
-`TransmitPhase1to2` (`:354`); `sign_phase2` constant-time cross-checks every counterparty's echo against
-its own (`:544–556` → `RootAgreementMismatch`, **recoverable + identifiable**) **before** the leak-bearing
+`TransmitPhase1to2` (`:358`); `sign_phase2` constant-time cross-checks every counterparty's echo against
+its own (`:566–578` → `RootAgreementMismatch`, **recoverable + identifiable**) **before** the leak-bearing
 mul. DKG only *binds* each aux chain code (commit-vs-open) but never cross-verifies the *assembled* root,
 and `session_id` enters the keyshare unchecked — so without this echo two honest parties left with
 divergent-but-valid views would only diverge at the phase-2 COTe check and **ban each other** (key
@@ -200,21 +200,29 @@ destruction). The in-core echo closes the honest-divergence case; a *malicious* 
 matching echo while signing under a different root still bans at phase 2 — full equivocation resistance is
 the authenticated-broadcast/transport layer's job (TOB-SILA-6/9/14, backend `kawasekit-mpc-2p`).
 
-**Complete ban-vs-recoverable map** (verified: **4 ban, 32 recoverable**). The two mul bans are now
+**ToB-M2** (protocol-version handshake) — `sign_phase1` stamps the crate `PROTOCOL_VERSION` (`lib.rs:55`)
+into `TransmitPhase1to2` (`:422`); `sign_phase2` checks it against ours **before** any leak-bearing step
+(`:545` → `ProtocolVersionMismatch { counterparty, expected, got }`, recoverable). So two parties on
+incompatible library versions (e.g. one not yet carrying a security fix) abort early and identifiably
+instead of degrading to an opaque later consistency/proof failure or a ban. Bump `PROTOCOL_VERSION` on any
+wire/transcript-incompatible change.
+
+**Complete ban-vs-recoverable map** (verified: **4 ban, 33 recoverable**). The two mul bans are now
 **kind-aware** — they `match error.kind` and ban only on `ConsistencyFailure`, downgrading
 `MalformedMessage` to recoverable (H1, 2nd round):
 
 | Kind | Line | Trigger | Reason |
 |------|------|---------|--------|
-| **BAN** | `:628` | `mul_sender.run` Err with `kind==ConsistencyFailure` (phase 2) | `MultiplicationVerificationFailed` |
-| **BAN** | `:836` | `mul_receiver.run_phase2` Err `ConsistencyFailure` — the leak-bearing `verify_r` (phase 3) | `MultiplicationVerificationFailed` |
-| **BAN** | `:864` | `R_j·chi ≠ d_u·G + gamma_u` (phase 3) | `GammaUInconsistency` |
-| **BAN** | `:876` | `pk_j·chi ≠ d_v·G + gamma_v` (phase 3) | `OtConsistencyCheckFailed` |
+| **BAN** | `:650` | `mul_sender.run` Err with `kind==ConsistencyFailure` (phase 2) | `MultiplicationVerificationFailed` |
+| **BAN** | `:858` | `mul_receiver.run_phase2` Err `ConsistencyFailure` — the leak-bearing `verify_r` (phase 3) | `MultiplicationVerificationFailed` |
+| **BAN** | `:886` | `R_j·chi ≠ d_u·G + gamma_u` (phase 3) | `GammaUInconsistency` |
+| **BAN** | `:898` | `pk_j·chi ≠ d_v·G + gamma_v` (phase 3) | `OtConsistencyCheckFailed` |
 | recoverable | `:636/:844` | mul Err with `kind==MalformedMessage` (phases 2/3) | `MultiplicationVerificationFailed` |
-| recoverable | `:551` | counterparty's root echo ≠ ours — chain-code/session-id disagreement, **before** any leak-bearing mul (ToB-H1) | `RootAgreementMismatch` |
-| recoverable | `:393` | `mul_receiver.run_phase1` Err — no leak-bearing check has run yet | `MultiplicationVerificationFailed` |
-| recoverable | `:275` | `session_id`/`sign_id` length ≠ `ID_LEN` (L1) | `MalformedSessionId` |
-| recoverable | `:988` | `x_coord` not valid field-length hex (M6) | `InvalidXCoordinateHex` |
+| recoverable | `:545` | counterparty's `protocol_version` ≠ ours — **before** any leak-bearing step (ToB-M2) | `ProtocolVersionMismatch` |
+| recoverable | `:573` | counterparty's root echo ≠ ours — chain-code/session-id disagreement, **before** any leak-bearing mul (ToB-H1) | `RootAgreementMismatch` |
+| recoverable | `:397` | `mul_receiver.run_phase1` Err — no leak-bearing check has run yet | `MultiplicationVerificationFailed` |
+| recoverable | `:279` | `session_id`/`sign_id` length ≠ `ID_LEN` (L1) | `MalformedSessionId` |
+| recoverable | `:1010` | `x_coord` not valid field-length hex (M6) | `InvalidXCoordinateHex` |
 | recoverable | many | party-set / routing / commitment / signature-verify failures | various |
 
 ### 3.8 Refresh — `protocols/refresh.rs` (2384)
@@ -260,7 +268,7 @@ recovery_id:u8}` is a public value type, no zeroize (signature is public).
 - **I-KEYGEN** — group key = Lagrange-in-exponent of fragments; every contiguous `t`-window must agree (`dkg.rs:411–453` → `PolynomialInconsistency`); `verifying_share[i] == poly_point_i·G`.
 - **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:882`).
 - **I-ZEROSHARE** — `Σ ζ_i == 0` over the signer set (`zero_shares.rs:79,123–127`).
-- **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:995`); re-verified (`:1006`).
+- **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:1017`); re-verified (`:1028`).
 - **I-DERIVE** — same public `tweak` added to every share shifts `sk→sk+tweak`, `pk→pk+tweak·G` (`derivation.rs:172–174,349–353`).
 - **I-REFRESH** — correction polynomial has constant term 0 → `pk` preserved; correction-pk == identity enforced (`refresh.rs:411/896`).
 
@@ -297,7 +305,7 @@ Verified distribution: **signing = 4 bans; DKG = 0; refresh = 0.**
 **Resolved in the 2nd round (was a flagged structural fact):** the ban formerly discriminated by `Result`
 *presence* only — any `Err` banned. H1 gave `ErrorOT`/`ErrorMul` a machine-readable `kind`
 (`OtErrorKind`/`MulErrorKind` ∈ {`ConsistencyFailure`, `MalformedMessage`}); signing now `match`es on it
-(`signing.rs:627–643/835–851`) and bans **only** on `ConsistencyFailure`. The two layers carry *inverted*
+(`signing.rs:649–665/857–873`) and bans **only** on `ConsistencyFailure`. The two layers carry *inverted*
 `::new` defaults — `ErrorMul::new`→`ConsistencyFailure` (ban-safe), `ErrorOT::new`→`MalformedMessage` —
 reconciled by `ErrorMul::from_ot` propagating the OT kind 1:1. The two leak-bearing roots: mul `verify_r`
 (`multiplication.rs:694`) and the COTe consistency fold (`extension.rs:365`). A malformed-*dimension*
@@ -327,7 +335,7 @@ Ranked by concentration of subtle invariants × attacker reachability:
 1. **OTE consistency check + forced-reuse** (`extension.rs:359–368`) — sole gate protecting reused
    correlations; constant-time compare **and** (after M1) constant-time `field_mul`; the ban it raises is
    now kind-tagged (H1); session-separation rests on unique caller `session_id`.
-2. **Signing u/v/γ consistency + signature assembly** (`signing.rs:824–885,954–1048`) — deferred-inversion
+2. **Signing u/v/γ consistency + signature assembly** (`signing.rs:846–907,976–1070`) — deferred-inversion
    algebra, the two γ relations binding mul outputs to committed points, recovery-id derivation.
 3. **Fast-refresh OT re-randomization** (`refresh.rs:1071–1156`) — in-place bit/seed mutation with
    index-order swap; trusts pre-existing correlations (deferred-detection at next-sign `verify_r`, now tested — M3).
@@ -357,17 +365,18 @@ Ranked by concentration of subtle invariants × attacker reachability:
 
 | Claim | Method | Result |
 |-------|--------|--------|
-| Signing ban sites | `grep Abort::ban signing.rs` | 4 (`:628/836/864/876`) ✓ |
-| Signing recoverable | `grep -c Abort::recoverable` | 32 ✓ |
-| Root agreement echo (ToB-H1) | `grep RootAgreementMismatch signing.rs` | phase-1 echo `:354`, phase-2 cross-check `:544–556` before mul ✓ |
+| Signing ban sites | `grep Abort::ban signing.rs` | 4 (`:650/858/886/898`) ✓ |
+| Signing recoverable | `grep -c Abort::recoverable` | 33 ✓ |
+| Root agreement echo (ToB-H1) | `grep RootAgreementMismatch signing.rs` | phase-1 echo `:358`, phase-2 cross-check `:566–578` before mul ✓ |
+| Protocol-version handshake (ToB-M2) | `grep ProtocolVersionMismatch signing.rs` | phase-1 stamp `:422`, phase-2 check `:545` before any leak-bearing step ✓ |
 | DKG / refresh bans | `grep -c Abort::ban` | 0 / 0 ✓ |
-| Ban is kind-aware (H1) | read `signing.rs:627–643/835–851` | `match error.kind` ✓ |
+| Ban is kind-aware (H1) | read `signing.rs:649–665/857–873` | `match error.kind` ✓ |
 | Error `kind` machinery (H1) | read `ot.rs:17–49`, `multiplication.rs:126–173` | `OtErrorKind`/`MulErrorKind` + `from_ot` 1:1 ✓ |
 | `field_mul` constant-time (M1) | read `extension.rs:923–927` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
 | EncProof nonce zeroized (M2) | `grep Zeroizing proofs.rs` | `:805` (deref `:876`) ✓ |
 | SignSession low-S default (M4) | read `sign_session.rs:74/234` | always `!s.is_high()` ✓ |
-| M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:988` (after `ZeroDenominator` `:973`) ✓ |
-| L1 ssid length | `grep MalformedSessionId signing.rs` | `:275` (`ID_LEN`=32) ✓ |
+| M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:1010` (after `ZeroDenominator` `:995`) ✓ |
+| L1 ssid length | `grep MalformedSessionId signing.rs` | `:279` (`ID_LEN`=32) ✓ |
 | M3 trivial-share + H1 zeroize | `grep TrivialKeyShare\|self.zeroize` | `:700/1189`, `:736/1226` ✓ |
 | M3 fast-path tested | `grep 'fn test' refresh.rs` | `:1449`, `:1540` ✓ |
 | M1 identity rejection (1st round) | `grep identity proofs.rs` | `:388` (DLog), `:667` (CP/Enc) ✓ |

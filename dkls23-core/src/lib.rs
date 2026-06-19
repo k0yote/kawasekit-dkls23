@@ -44,3 +44,12 @@ pub const SECURITY: u16 = 32;
 
 /// Statistical security parameter `lambda_s` from `DKLs23`.
 pub const STAT_SECURITY: u16 = 80;
+
+/// Runtime protocol version of this library (ToB-M2 / TOB-SILA-11a).
+///
+/// Bound into the signing setup so two parties on **incompatible** library versions abort
+/// early with a dedicated [`AbortReason::ProtocolVersionMismatch`](crate::protocols::AbortReason)
+/// instead of degrading to an opaque later consistency/proof failure (or a ban). **Bump this
+/// whenever a change alters wire/transcript compatibility** — e.g. a new/renamed oracle tag, a
+/// message-format change, or any security fix that must not interoperate with older peers.
+pub const PROTOCOL_VERSION: u16 = 1;

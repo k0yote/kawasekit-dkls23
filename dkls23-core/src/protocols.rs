@@ -377,6 +377,16 @@ pub enum AbortReason {
         counterparty: PartyIndex,
     },
 
+    /// M2 (ToB TOB-SILA-11a): a counterparty advertised a protocol version incompatible with
+    /// ours. Recoverable and identifiable: surfaced *early* (before any leak-bearing step) so a
+    /// cross-version interaction aborts clearly instead of degrading to an opaque later
+    /// consistency/proof failure (or a ban). `expected` is our `PROTOCOL_VERSION`; `got` is theirs.
+    ProtocolVersionMismatch {
+        counterparty: PartyIndex,
+        expected: u16,
+        got: u16,
+    },
+
     // --- Session state machine ---
     PhaseCalledOutOfOrder {
         phase: String,
@@ -475,6 +485,14 @@ impl fmt::Display for AbortReason {
                     "root (chain-code/session-id) disagreement with party {counterparty}"
                 )
             }
+            Self::ProtocolVersionMismatch {
+                counterparty,
+                expected,
+                got,
+            } => write!(
+                f,
+                "protocol version mismatch with party {counterparty}: expected {expected}, got {got}"
+            ),
             Self::PhaseCalledOutOfOrder { phase } => {
                 write!(f, "{phase}")
             }

@@ -121,16 +121,16 @@ M2) and surfaced **one genuinely new gap** plus pre-audit hardening.
 |---|---|---|---|---|
 | **H1** `[ssid]` `[abort]` | Cross-party **agreement** on the assembled DKG root (`chain_code`) + session ids was unverified in-core (DKG *binds* each aux chain code but never cross-verifies the *assembled* root; `session_id` enters the keyshare unchecked) → two honest parties left with divergent-but-valid views would **ban each other** at the leak-bearing phase-2 COTe check (key-destruction). Fix: `sign_phase1` broadcasts a Fiat-Shamir echo `H(session_id ‖ sign_id ‖ chain_code)`; `sign_phase2` constant-time cross-checks it **before** any leak-bearing mul → `RootAgreementMismatch` (recoverable + identifiable). | `protocols/signing.rs`, `protocols.rs`, `utilities/oracle_tags.rs` | #38 | yes |
 | **M1** `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D): `t_b` (OTE), the gadget-fold `b`, and the `verify_u` entry. Fix: compute both branches and `Choice`-select (`subtle::ConditionallySelectable`) instead of `if bit { … }` — no secret-dependent branch; behaviour unchanged. Measured-timing verdict stays paid-audit-reserved. | `utilities/ot/extension.rs`, `utilities/multiplication.rs` | #40 | yes |
+| **M2** `[ssid]` | No runtime protocol-version handshake (TOB-SILA-11a): a version mismatch surfaced only as an opaque later consistency/proof failure (or a ban). Fix: a crate `PROTOCOL_VERSION` stamped into the signing phase-1 broadcast and checked in `sign_phase2` **before** any leak-bearing step → `ProtocolVersionMismatch` (recoverable, identifiable). Defense-in-depth; not key-affecting. | `lib.rs`, `protocols/signing.rs`, `protocols.rs` | #41 | yes |
 
 > **Scope (honesty):** the in-core echo closes the **honest-divergence** case (a passive relay delivering
 > different-but-each-valid views). A **malicious** equivocator that forges a matching echo while signing under
 > a different root still bans at phase 2 — full equivocation resistance is the authenticated-broadcast /
 > transport layer's responsibility (TOB-SILA-6/9/14, carried to the backend `kawasekit-mpc-2p`).
 
-Still-open ToB items (tracked as issues `[ToB-M2..L4]`): **M2** (early protocol-version-mismatch abort),
-**L1** (256-vs-128 doc), **L2** (γ_v / base-OT `s≠0` negative tests), **L3** (`cargo-llvm-cov` + `dylint` in
-CI), **L4** (`zip_eq` at the COTe fold). The OT/VOLE multiplication soundness and all *measured* side-channel
-work stay **reserved for the paid audit**.
+Still-open ToB items (tracked as issues `[ToB-L1..L4]`): **L1** (256-vs-128 doc), **L2** (γ_v / base-OT
+`s≠0` negative tests), **L3** (`cargo-llvm-cov` + `dylint` in CI), **L4** (`zip_eq` at the COTe fold). The
+OT/VOLE multiplication soundness and all *measured* side-channel work stay **reserved for the paid audit**.
 
 ## Frozen release-candidate crypto versions
 

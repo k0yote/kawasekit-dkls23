@@ -73,6 +73,10 @@ pub struct SignData {
 pub struct TransmitPhase1to2 {
     pub parties: PartiesMessage,
     pub commitment: HashOutput,
+    /// M2 (ToB TOB-SILA-11a): the sender's library `PROTOCOL_VERSION`, cross-checked in
+    /// phase 2 *before* any leak-bearing step so incompatible versions abort early and
+    /// identifiably (`ProtocolVersionMismatch`) instead of an opaque later failure.
+    pub protocol_version: u16,
     /// H1 (ToB TOB-SILA-7+8): Fiat-Shamir echo of the assembled DKG root
     /// (`chain_code`) and the session identifiers (`session_id` / `sign_id`).
     /// Cross-checked in phase 2 *before* any leak-bearing OT/multiplication step,
@@ -415,6 +419,7 @@ impl<C: DklsCurve> Party<C> {
                     receiver: *counterparty,
                 },
                 commitment,
+                protocol_version: crate::PROTOCOL_VERSION,
                 root_digest,
                 mul_transmit,
             });
@@ -530,6 +535,23 @@ impl<C: DklsCurve> Party<C> {
                     got: received.len(),
                 },
             ));
+        }
+
+        // M2 (ToB TOB-SILA-11a): reject a counterparty on an incompatible protocol version
+        // BEFORE any leak-bearing step, with a dedicated identifiable reason — so a
+        // cross-version interaction (e.g. one party not yet carrying a security fix) aborts
+        // clearly instead of degrading to an opaque later consistency/proof failure or a ban.
+        for message in received {
+            if message.protocol_version != crate::PROTOCOL_VERSION {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::ProtocolVersionMismatch {
+                        counterparty: message.parties.sender,
+                        expected: crate::PROTOCOL_VERSION,
+                        got: message.protocol_version,
+                    },
+                ));
+            }
         }
 
         // H1 (ToB TOB-SILA-7+8): cross-party agreement on the assembled DKG root
@@ -2315,6 +2337,42 @@ mod tests {
         let abort = result.expect_err("unknown sender should be rejected");
         assert_eq!(abort.kind, AbortKind::Recoverable);
         assert!(matches!(abort.reason, AbortReason::UnexpectedSender { .. }));
+    }
+
+    /// ToB-M2 (TOB-SILA-11a): a counterparty advertising a different protocol version must
+    /// abort *early* with a dedicated, identifiable reason — not degrade to an opaque later
+    /// consistency/proof failure (or a ban). The check runs before any leak-bearing step.
+    #[test]
+    fn test_sign_phase2_rejects_protocol_version_mismatch() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+
+        let mut tampered = received_1to2
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        // The counterparty is running a different library / protocol version.
+        tampered[0].protocol_version = crate::PROTOCOL_VERSION + 1;
+
+        let result = parties[0].sign_phase2(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("a protocol-version mismatch must abort");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(
+            matches!(
+                abort.reason,
+                AbortReason::ProtocolVersionMismatch { counterparty, expected, got }
+                    if counterparty == PartyIndex::new(2).unwrap()
+                        && expected == crate::PROTOCOL_VERSION
+                        && got == crate::PROTOCOL_VERSION + 1
+            ),
+            "expected ProtocolVersionMismatch identifying party 2, got {:?}",
+            abort.reason
+        );
     }
 
     /// Tests if phase 2 rejects messages addressed to a different receiver.
