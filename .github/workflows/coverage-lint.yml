@@ -1,9 +1,11 @@
 name: Coverage & lint
 
 # ToB-L3 (TOB tooling): wire two of ToB's standard tools into CI.
-#  - cargo-llvm-cov: coverage report (surfaces the untested error/abort arms that the
-#    hand-crafted negative tests miss). Report-only for now (no hard threshold) — a
-#    `--fail-under-*` gate can be added once a baseline is agreed.
+#  - cargo-llvm-cov: coverage report + a regression gate. Baseline at the time of writing is
+#    ~89.8% lines (93.9% regions); the gate `--fail-under-lines 85` is a deliberately
+#    conservative floor (~5 pts headroom) so it catches a real coverage regression — a deleted
+#    test suite or a large untested module — without flaking on the small run-to-run variation
+#    from randomized-input tests. Raise the floor as coverage stabilizes higher.
 #  - cargo-dylint: runs Trail of Bits' general-purpose lints. ADVISORY (continue-on-error):
 #    the lints are compiled from git against their own toolchain, so a setup hiccup must
 #    never block the PR; findings show in the job log.
@@ -38,8 +40,8 @@ jobs:
         run: cargo install cargo-llvm-cov --locked
       - name: Collect coverage (workspace)
         run: cargo llvm-cov --no-report --workspace
-      - name: Summary report
-        run: cargo llvm-cov report --summary-only
+      - name: Summary report + regression gate
+        run: cargo llvm-cov report --summary-only --fail-under-lines 85
       - name: lcov report
         run: cargo llvm-cov report --lcov --output-path lcov.info
       - uses: actions/upload-artifact@v4
