@@ -36,6 +36,7 @@
 //! instead of taking a vector of k-tuples of correlations, we equivalently deal with
 //! k vectors of single correlations, where k is the OT width.
 
+use itertools::Itertools;
 use rand::RngExt;
 #[cfg(feature = "serde")]
 use serde::de::Error;
@@ -356,9 +357,13 @@ impl OTESender {
 
         // The two values must agree (constant-time comparison to prevent
         // timing side-channels that could help forge consistency-check values).
+        // ToB-L4: `zip_eq` (not `zip`) so an unexpected length divergence between the two
+        // KAPPA-length vectors is a hard failure, never a silent truncation. Both are built
+        // by `0..KAPPA` loops over `data.verify_t` (length-checked == KAPPA upstream), so the
+        // lengths always match and this never panics — defense-in-depth (TOB-SILA-2 mechanic).
         let consistent = verify_q
             .iter()
-            .zip(verify_sender.iter())
+            .zip_eq(verify_sender.iter())
             .fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
         if !bool::from(consistent) {
             // H1: the COTe consistency check is the one leak-bearing OT error — it must ban.

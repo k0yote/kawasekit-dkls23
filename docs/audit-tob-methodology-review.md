@@ -59,10 +59,10 @@ justify before the paid audit.
 | H1 ✅ | 🟠 High | `[ssid]` `[abort]` | Chain-code / session-id cross-party agreement unverified → honest-party ban (TOB-SILA-7+8) — **RESOLVED PR #38** | 1–2d | strongly rec. (library-level) |
 | M1 ✅ | 🟡 Medium | `[const-time]` | Three residual secret-choice-bit branches beyond `field_mul` (TOB appendix D) — **RESOLVED PR #40** | 1d | pre-audit |
 | M2 ✅ | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) — **RESOLVED PR #41** | 0.5d | pre-audit |
-| L1 | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) | 0.25d | polish (doc) |
-| L2 | 🟢 Low | `[validation]` | Missing negative tests: γ_v ban + base-OT `s≠0`; no property-based testing | 0.5d | pre-audit |
+| L1 ✅ | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) — **RESOLVED PR #42** | 0.25d | polish (doc) |
+| L2 ✅ | 🟢 Low | `[validation]` | Missing negative tests: γ_v ban + base-OT `s≠0`; no property-based testing — **RESOLVED PR #42** | 0.5d | pre-audit |
 | L3 | 🟢 Low | `[supply-chain]` | `cargo-llvm-cov` + `dylint` not in CI (ToB's tooling) | 0.25d | polish |
-| L4 | 🟢 Low | `[validation]` | `zip` (not `zip_eq`) at the COTe consistency fold | 0.1d | polish |
+| L4 ✅ | 🟢 Low | `[validation]` | `zip` (not `zip_eq`) at the COTe consistency fold — **RESOLVED PR #42** | 0.1d | polish |
 
 **Total ≈ 4–5 engineer-days.** Close **H1** (and **L2**'s γ_v/`s≠0` tests) before commissioning the audit — H1
 is the one that changes the artifact's robustness story. M1/M2/L1/L3/L4 are hardening/polish the auditor would
@@ -198,6 +198,11 @@ do not commit — leave the diff for PR review.
 
 ### L1. RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented `[supply-chain]` `[boundary]`
 
+> **✅ RESOLVED (2026-06-20, PR #42).** Added a paragraph at the `lib.rs` constants clarifying that
+> `KAPPA=256` is the OT-correlation/seed width (not a security claim), `STAT_SECURITY=80` the statistical
+> soundness, and computational security tracks the curve (~128-bit). No numbers change; adequacy stays
+> paid-audit-reserved. Mirrored in `docs/audit-context.md` §1.
+
 **Problem.** `RAW_SECURITY = KAPPA = lambda_c = 256` (`lib.rs:39-41`, `extension.rs:63`) while the curve
 (secp256k1/p256) and hash (SHA-256) deliver ~128-bit computational security — the same over-provisioning ToB
 flagged for SilentShard (λc=256 over 128-bit primitives). The parameterization is **internally consistent**
@@ -210,6 +215,12 @@ count, `STAT_SECURITY=80` is the statistical soundness, and computational securi
 **Done:** the constants block carries the note; no number changes. (Adequacy of the choice stays paid-audit-reserved.)
 
 ### L2. Missing negative tests + no property-based testing `[validation]`
+
+> **✅ RESOLVED (2026-06-20, PR #42).** Added the two missing negative tests —
+> `test_sign_phase3_bans_on_inconsistent_gamma_v` (tampers γ_v, asserts the `OtConsistencyCheckFailed`
+> ban) and `test_ot_base_sender_secret_is_nonzero` (the base-OT `s≠0` sampling guard) — and **introduced
+> `proptest`** on the input-validation surface (`PartyIndex` / `Parameters` range validation, x-coord hex
+> parse never-panics). Message-level proptest fuzzing can be expanded later.
 
 **Problem.** The leak-bearing checks are well covered, but two spec-mandated ban conditions have **no negative
 test**: the γ_v check (`OtConsistencyCheckFailed`, `signing.rs:828-832` — only γ_u is tested) and the base-OT
@@ -229,6 +240,11 @@ lints. **Fix approach.** Add a `cargo llvm-cov` CI job (gate or report on the er
 run. **Done:** both run in CI; the coverage report flags any untested abort arm.
 
 ### L4. `zip` (not `zip_eq`) at the consistency fold `[validation]`
+
+> **✅ RESOLVED (2026-06-20, PR #42).** `zip` → `itertools::Itertools::zip_eq` at the COTe fold. Verified
+> safe: both vectors are built by `0..KAPPA` loops over `data.verify_t` (length-checked `== KAPPA` upstream),
+> so the lengths always match and `zip_eq` never panics — pure defense-in-depth against a future
+> silent-truncation regression.
 
 **Problem.** `extension.rs:361` uses `.zip()` (silent-truncation) in the COTe consistency fold. The two
 vectors are equal-length by construction (KAPPA), so this is not exploitable, but ToB's code-quality
