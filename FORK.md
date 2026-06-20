@@ -124,6 +124,7 @@ M2) and surfaced **one genuinely new gap** plus pre-audit hardening.
 | **M2** `[ssid]` | No runtime protocol-version handshake (TOB-SILA-11a): a version mismatch surfaced only as an opaque later consistency/proof failure (or a ban). Fix: a crate `PROTOCOL_VERSION` stamped into the signing phase-1 broadcast and checked in `sign_phase2` **before** any leak-bearing step → `ProtocolVersionMismatch` (recoverable, identifiable). Defense-in-depth; not key-affecting. | `lib.rs`, `protocols/signing.rs`, `protocols.rs` | #41 | yes |
 | **L1** `[supply-chain]` | Document that `KAPPA=256` is the OT-correlation width, not a security claim; computational security tracks the curve (~128-bit). Doc-only, no number changes. | `lib.rs`, `docs/audit-context.md` | #42 | yes |
 | **L2** `[validation]` | Add the missing γ_v-ban and base-OT `s≠0` negative tests; introduce `proptest` on the input-validation surface (PartyIndex/Parameters/hex). Tests + `proptest` dev-dep only. | `protocols/signing.rs`, `utilities/ot/base.rs`, `protocols.rs` | #42 | yes |
+| **L3** `[supply-chain]` | Wire two of ToB's tools into CI: a `cargo llvm-cov` coverage job (report + lcov artifact) and an advisory `cargo dylint` job (ToB general lints, `continue-on-error`). CI/tooling only; no crate change. | `.github/workflows/coverage-lint.yml`, `Cargo.toml` | #43 | yes |
 | **L4** `[validation]` | `zip` → `itertools::zip_eq` at the COTe consistency fold (length-safe; never panics — both vectors are KAPPA by construction). Adds the `itertools` dep. | `utilities/ot/extension.rs` | #42 | yes |
 
 > **Scope (honesty):** the in-core echo closes the **honest-divergence** case (a passive relay delivering
@@ -131,8 +132,9 @@ M2) and surfaced **one genuinely new gap** plus pre-audit hardening.
 > a different root still bans at phase 2 — full equivocation resistance is the authenticated-broadcast /
 > transport layer's responsibility (TOB-SILA-6/9/14, carried to the backend `kawasekit-mpc-2p`).
 
-Still-open ToB item (tracked as issue `[ToB-L3]`): **L3** (`cargo-llvm-cov` + `dylint` in CI). The OT/VOLE
-multiplication soundness and all *measured* side-channel work stay **reserved for the paid audit**.
+All ToB-methodology findings (H1, M1, M2, L1–L4) are now resolved (PRs #38, #40–#43). The OT/VOLE
+multiplication soundness and all *measured* side-channel work stay **reserved for the paid audit**, and the
+transport-layer classes (TOB-SILA-6/9/14) are carried to the backend `kawasekit-mpc-2p`.
 
 ## Frozen release-candidate crypto versions
 

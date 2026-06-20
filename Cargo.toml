@@ -5,3 +5,11 @@ members = [
     "dkls23-secp256r1",
 ]
 resolver = "2"
+
+# ToB-L3: Dylint lint libraries run by the (advisory) `dylint` CI job. We use Trail of Bits'
+# own general-purpose example lints (ToB maintains Dylint). `workspace.metadata` is ignored by
+# `cargo build`/resolve — it only affects `cargo dylint`, so it adds no runtime/build dependency.
+[workspace.metadata.dylint]
+libraries = [
+    { git = "https://github.com/trailofbits/dylint", pattern = "examples/general/*" },
+]
