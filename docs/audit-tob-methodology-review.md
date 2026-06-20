@@ -236,10 +236,13 @@ condition has a negative test; `proptest` exercises the deserialize/validate bou
 
 > **✅ RESOLVED (2026-06-20, PR #43).** Added `.github/workflows/coverage-lint.yml` with two jobs:
 > a **`cargo llvm-cov`** coverage job (collects workspace coverage, prints a summary, uploads an lcov
-> artifact — report-only for now; a `--fail-under-*` gate can follow once a baseline is agreed), and an
-> **advisory `cargo dylint`** job (`continue-on-error`) running Trail of Bits' general-purpose lints
-> (configured in `[workspace.metadata.dylint]`). Advisory because the lints compile from git with their own
-> toolchain — a setup hiccup must not block the PR; findings surface in the job log.
+> artifact), and an **advisory `cargo dylint`** job (`continue-on-error`) running Trail of Bits'
+> general-purpose lints (configured in `[workspace.metadata.dylint]`). Advisory because the lints compile
+> from git with their own toolchain — a setup hiccup must not block the PR; findings surface in the job log.
+>
+> **Coverage gate added (2026-06-20, PR #45):** the llvm-cov job now gates with `--fail-under-lines 85`
+> (baseline ~89.8% lines; conservative ~5-pt floor to catch a real regression without flaking on
+> randomized-test variation). Raise as coverage stabilizes higher.
 
 **Problem.** `cargo-llvm-cov` and `cargo-dylint` are not installed/wired (`cargo-audit` is, via `supply-chain.yml`).
 ToB used coverage to find untested branches (the error/abort arms negative tests miss) and Dylint for Rust
