@@ -1190,6 +1190,16 @@ mod tests {
         String::new()
     }
 
+    // ToB-L2: property-based fuzzing of the x-coordinate hex parser — arbitrary input must
+    // never panic (it returns a canonical scalar or `None`). Complements the hand-crafted
+    // malformed-hex unit tests.
+    proptest::proptest! {
+        #[test]
+        fn prop_parse_hex_to_scalar_never_panics(s in ".{0,80}") {
+            let _ = parse_hex_to_scalar::<TestCurve>(&s);
+        }
+    }
+
     /// Tests if the signing protocol generates a valid ECDSA signature.
     ///
     /// In this case, parties are sampled via the [`re_key`] function.
@@ -2515,6 +2525,46 @@ mod tests {
         assert!(matches!(
             abort.reason,
             AbortReason::GammaUInconsistency { .. }
+        ));
+    }
+
+    /// ToB-L2: phase 3 must emit a ban on the **gamma_v** consistency check too — the second
+    /// spec-mandated check (`pk_j·chi ≠ d_v·G + gamma_v` → `OtConsistencyCheckFailed`), which
+    /// previously had no negative test (only gamma_u did). Tampering `gamma_v` (and leaving
+    /// `gamma_u` correct) makes the gamma_u check pass and the gamma_v check fire.
+    #[test]
+    fn test_sign_phase3_bans_on_inconsistent_gamma_v() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+        let (unique_kept_2to3, kept_2to3, received_2to3) = run_two_party_phase2(
+            &parties,
+            &all_data,
+            &unique_kept_1to2,
+            &kept_1to2,
+            &received_1to2,
+        );
+
+        let mut tampered = received_2to3
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        tampered[0].gamma_v =
+            (ProjectivePoint::from(tampered[0].gamma_v) + ProjectivePoint::GENERATOR).to_affine();
+
+        let result = parties[0].sign_phase3(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_2to3.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("inconsistent gamma_v should be rejected");
+        assert_eq!(
+            abort.kind,
+            AbortKind::BanCounterparty(PartyIndex::new(2).unwrap())
+        );
+        assert!(matches!(
+            abort.reason,
+            AbortReason::OtConsistencyCheckFailed { .. }
         ));
     }
 

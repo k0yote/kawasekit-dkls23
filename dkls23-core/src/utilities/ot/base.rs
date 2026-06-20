@@ -366,6 +366,21 @@ mod tests {
             .contains("Sender cheated in OT: Proof of discrete logarithm failed!"));
     }
 
+    /// ToB-L2: the base-OT sender secret `s` is sampled **nonzero** (`OTSender::init`'s
+    /// `while s == 0` guard). A zero `s` would make the two OT pads `m0 = v·s` and
+    /// `m1 = (v−h)·s` collapse and leak the receiver's choice, so the invariant is
+    /// security-relevant. A few independent draws exercise the guard (it is correct by
+    /// construction — sampling zero has probability 2⁻²⁵⁶ — so the count is kept small
+    /// because each `init` runs a full Fischlin DLog proof).
+    #[test]
+    fn test_ot_base_sender_secret_is_nonzero() {
+        for _ in 0..8 {
+            let session_id = rng::get_rng().random::<[u8; 32]>();
+            let sender = OTSender::<TestCurve>::init(&session_id);
+            assert_ne!(sender.s, Scalar::ZERO);
+        }
+    }
+
     /// Ensures sender rejects a tampered encryption proof from receiver.
     #[test]
     fn test_ot_base_rejects_tampered_enc_proof() {

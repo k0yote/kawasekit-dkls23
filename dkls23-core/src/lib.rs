@@ -36,6 +36,16 @@ pub use protocols::signature::EcdsaSignature;
 // They are the same as the reference implementation of DKLs19:
 // https://gitlab.com/neucrypt/mpecdsa/-/blob/release/src/lib.rs
 
+// ToB-L1 (TOB appendix F) — security-level parameterization, to avoid misreading `256` as a
+// security claim. `RAW_SECURITY = KAPPA = lambda_c = 256` is the **OT-correlation / seed width**
+// (the number of base-OT instances the extension stretches), NOT the computational security
+// level. Statistical soundness is `STAT_SECURITY = lambda_s = 80`, and the KOS consistency
+// budget is `OT_SECURITY = 128 + 80 = 208` bits. The actual **computational** security tracks
+// the instantiating primitives — the curve (secp256k1 / P-256, ~128-bit) and SHA-256 — i.e.
+// ~128-bit, exactly as DKLs23 intends. The 256-vs-128 "over-provisioning" mirrors what ToB
+// flagged for SilentShard; it is internally consistent here, and the *adequacy* of the choice
+// stays reserved for the paid third-party audit. No numbers change.
+
 /// Computational security parameter `lambda_c` from `DKLs23`.
 /// We take it to be the same as the parameter `kappa`.
 pub const RAW_SECURITY: u16 = 256;

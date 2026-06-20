@@ -567,7 +567,28 @@ impl PartiesMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use std::collections::BTreeMap;
+
+    // ToB-L2: property-based ("introduce proptest") fuzzing of the input-validation surface —
+    // out-of-range party indices and parameters — complementing the hand-crafted negative tests.
+    proptest! {
+        /// `PartyIndex::new` accepts exactly the nonzero `u8`s and round-trips them.
+        #[test]
+        fn prop_party_index_new_iff_nonzero(v in any::<u8>()) {
+            let r = PartyIndex::new(v);
+            prop_assert_eq!(r.is_ok(), v != 0);
+            if let Ok(pi) = r {
+                prop_assert_eq!(pi.as_u8(), v);
+            }
+        }
+
+        /// `Parameters::new` is `Ok` iff `1 < threshold <= share_count` (no out-of-range t/n slips through).
+        #[test]
+        fn prop_parameters_new_iff_valid(t in any::<u8>(), n in any::<u8>()) {
+            prop_assert_eq!(Parameters::new(t, n).is_ok(), t >= 2 && t <= n);
+        }
+    }
 
     #[test]
     fn party_index_rejects_zero() {
