@@ -136,6 +136,11 @@ All ToB-methodology findings (H1, M1, M2, L1–L4) are now resolved (PRs #38, #4
 multiplication soundness and all *measured* side-channel work stay **reserved for the paid audit**, and the
 transport-layer classes (TOB-SILA-6/9/14) are carried to the backend `kawasekit-mpc-2p`.
 
+**Follow-up (PR #44):** the ToB-M2 protocol-version check is **extended to DKG** — `PROTOCOL_VERSION` is
+stamped into `BroadcastDerivationPhase2to4` and checked in `dkg::phase4` so a cross-version *keygen* aborts
+early (`ProtocolVersionMismatch`). Cross-party root agreement (H1) stays **delegated to the signing-side
+echo** (no DKG round added — see the H1/M2 notes in `docs/audit-tob-methodology-review.md`).
+
 ## Frozen release-candidate crypto versions
 
 DKLs23 is built on the `k256` / `elliptic-curve` **0.14 release-candidate** line. There is **no stable `k256`

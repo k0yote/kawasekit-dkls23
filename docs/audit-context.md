@@ -83,7 +83,7 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 | **M5** | `[supply-chain]` | Yanked-crate / advisory runbook step (docs only) | `FORK.md`, `docs/security.md` |
 | **M6** | `[rust-safety]` | Up-front `x_coord` hex validation in `sign_phase4` (typed abort, not `.expect`) | `signing.rs:1007–1015` |
 | **L1** | `[ssid]` | Enforce canonical `ID_LEN`=32 `session_id`/`sign_id` at signing entry | `signing.rs:276–283` |
-| **L3** | `[rust-safety]` | Document the Fischlin `.expect` as an RNG fail-stop (not attacker-reachable) | `dkg.rs:349`, `base.rs:85` |
+| **L3** | `[rust-safety]` | Document the Fischlin `.expect` as an RNG fail-stop (not attacker-reachable) | `dkg.rs:353`, `base.rs:85` |
 | **L4** | `[OT]` | Document public-gadget agreement (a mismatch is caught downstream by `verify_r`) | `multiplication.rs:217/476` |
 
 *Second-round items closed by docs/tests only (no protocol-math change): M5, L3, L4. **L2** (wasm `getrandom`
@@ -175,11 +175,18 @@ SUBTRACTS, higher ADDS** → pairwise cancel → **I-ZEROSHARE** `Σ ζ_i = 0`. 
 ### 3.6 DKG — `protocols/dkg.rs` (1906)
 DKLs19 Protocol 9.1: 4 phases + 5 steps. `step1` sample degree-`t−1` poly → `step2` Horner eval at all
 indices → `step3` sum fragments into `poly_point`, `prove_commit` DLog of `P(i)` → `step5` decommit+verify,
-**Lagrange-in-exponent** PK reconstruction (`:411–453`) with contiguous-window consistency. `phase4`
+**Lagrange-in-exponent** PK reconstruction (`:415–457`) with contiguous-window consistency. `phase4`
 trivial-PK (`pk ∉ {identity, generator}`) + trivial-share (`poly_point ∉ {0,1}`) guards, then assembles
-`Party`. Chain code = **committed XOR** of all parties' aux codes (`:1075–1110`, unbiasable).
+`Party`. Chain code = **committed XOR** of all parties' aux codes (`:1100–1135`, unbiasable).
 **All DKG aborts are `recoverable`** (`Abort::ban` count = **0**) — a failed mul-init produces no reusable
-OT state, so the ban discipline does not apply yet (explicit comment `:1020–1021`).
+OT state, so the ban discipline does not apply yet (explicit comment `:1045–1046`).
+**ToB-M2 at DKG:** `phase2` stamps the crate `PROTOCOL_VERSION` into `BroadcastDerivationPhase2to4`
+(`:219`, `:568`); `phase4` cross-checks it before assembling the keyshare (`:787` → `ProtocolVersionMismatch`,
+recoverable) so a cross-version keygen aborts early at the source. Cross-party **root agreement** (ToB-H1) is
+**delegated to the signing-side echo** (`RootAgreementMismatch`), which prevents any signing under a divergent
+assembled root — so no extra DKG echo round is added (the assembled root is only known at `phase4`, and a
+dedicated DKG agreement round would change the round count / wire format for no safety gain over the
+signing-side gate).
 
 ### 3.7 Signing — `protocols/signing.rs` (2440) — the linchpin
 DKLs23 Protocol 3.6, 4 phases. Nonce `k` and inversion mask `φ` sampled (`:342–343`); `R_i = k·G` committed.
@@ -268,7 +275,7 @@ recovery_id:u8}` is a public value type, no zeroize (signature is public).
 ## 4. State & invariant catalog (line-anchored)
 
 **Correctness**
-- **I-KEYGEN** — group key = Lagrange-in-exponent of fragments; every contiguous `t`-window must agree (`dkg.rs:411–453` → `PolynomialInconsistency`); `verifying_share[i] == poly_point_i·G`.
+- **I-KEYGEN** — group key = Lagrange-in-exponent of fragments; every contiguous `t`-window must agree (`dkg.rs:415–457` → `PolynomialInconsistency`); `verifying_share[i] == poly_point_i·G`.
 - **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:882`).
 - **I-ZEROSHARE** — `Σ ζ_i == 0` over the signer set (`zero_shares.rs:79,123–127`).
 - **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:1017`); re-verified (`:1028`).
@@ -344,7 +351,7 @@ Ranked by concentration of subtle invariants × attacker reachability:
    index-order swap; trusts pre-existing correlations (deferred-detection at next-sign `verify_r`, now tested — M3).
 4. **EncProof OR-composition + endemic base OT** (`proofs.rs:753–959`, `base.rs:114–150`) — bit-privacy,
    FS challenge-sum binding, `h==base_h` pin.
-5. **DKG Lagrange-in-exponent + chain-code XOR** (`dkg.rs:411–453,1075–1110`).
+5. **DKG Lagrange-in-exponent + chain-code XOR** (`dkg.rs:415–457,1100–1135`).
 6. **Public-gadget agreement** (`multiplication.rs:221–230,480–489`) — derived identically both sides,
    **never asserted equal at runtime** (documented L4; a mismatch fails `verify_r` downstream).
 

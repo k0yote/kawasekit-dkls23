@@ -86,6 +86,11 @@ argument, and all *measured* side-channel work.
 > equivocation resistance remains the authenticated-broadcast / transport layer's job (TOB-SILA-6/9/14,
 > backend). The third-party crypto audit remains MANDATORY. *(The line numbers below are as-of-review and
 > predate the fix; current locations are in `docs/audit-context.md` §3.7.)*
+>
+> **DKG-side note (2026-06-20, PR #44):** cross-party *root agreement* is **deliberately delegated to this
+> signing-side echo** rather than adding a DKG agreement round. The assembled `chain_code` is only known at
+> `dkg::phase4`, so a DKG check would need a new echo round (changing the round count / wire format); since
+> the signing echo already prevents any signing under a divergent assembled root, that round adds no safety.
 
 **Problem.** The root chain code is a committed-XOR: each party commits then reveals its `aux_chain_code`
 (`dkg.rs:552-553`, `:709-713`), and every party verifies *each counterparty's* commitment-vs-opening and XORs
@@ -172,8 +177,12 @@ do not commit — leave the diff for PR review.
 > the signing phase-1 broadcast (`TransmitPhase1to2.protocol_version`) and cross-checked in `sign_phase2`
 > **before** any leak-bearing step → `AbortReason::ProtocolVersionMismatch { counterparty, expected, got }`
 > (recoverable, identifiable). A negative test drives a mismatched version and asserts the early abort.
-> Bound at the **signing** entry (the relevant path for the post-security-fix scenario; DKG coverage can
-> follow). Defense-in-depth, not key-affecting. *(Current locations in `docs/audit-context.md` §3.7.)*
+> Bound at the **signing** entry (the relevant path for the post-security-fix scenario). Defense-in-depth,
+> not key-affecting. *(Current locations in `docs/audit-context.md` §3.7.)*
+>
+> **Extended to DKG (2026-06-20, PR #44):** `PROTOCOL_VERSION` is now also stamped into
+> `BroadcastDerivationPhase2to4` and cross-checked at the top of `dkg::phase4` (→ `ProtocolVersionMismatch`)
+> so a cross-version *keygen* aborts early too. See `audit-context.md` §3.6.
 
 **Problem.** Oracle tags are versioned (`b".../v1"`) and centralized (`oracle_tags.rs:7-69`, uniqueness-tested),
 but there is **no runtime protocol-version field / handshake**. A version/tag mismatch between parties
