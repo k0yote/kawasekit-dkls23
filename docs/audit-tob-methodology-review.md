@@ -61,7 +61,7 @@ justify before the paid audit.
 | M2 ✅ | 🟡 Medium | `[ssid]` | No early protocol-version-mismatch abort (TOB-SILA-11a) — **RESOLVED PR #41** | 0.5d | pre-audit |
 | L1 ✅ | 🟢 Low | `[supply-chain]` `[boundary]` | RVOLE/OTE 256-vs-128 security-level over-provisioning undocumented (TOB appendix F) — **RESOLVED PR #42** | 0.25d | polish (doc) |
 | L2 ✅ | 🟢 Low | `[validation]` | Missing negative tests: γ_v ban + base-OT `s≠0`; no property-based testing — **RESOLVED PR #42** | 0.5d | pre-audit |
-| L3 | 🟢 Low | `[supply-chain]` | `cargo-llvm-cov` + `dylint` not in CI (ToB's tooling) | 0.25d | polish |
+| L3 ✅ | 🟢 Low | `[supply-chain]` | `cargo-llvm-cov` + `dylint` not in CI (ToB's tooling) — **RESOLVED PR #43** | 0.25d | polish |
 | L4 ✅ | 🟢 Low | `[validation]` | `zip` (not `zip_eq`) at the COTe consistency fold — **RESOLVED PR #42** | 0.1d | polish |
 
 **Total ≈ 4–5 engineer-days.** Close **H1** (and **L2**'s γ_v/`s≠0` tests) before commissioning the audit — H1
@@ -233,6 +233,13 @@ adversarial test is a single hand-crafted tamper. ToB's headline process recomme
 condition has a negative test; `proptest` exercises the deserialize/validate boundary.
 
 ### L3. ToB tooling absent from CI `[supply-chain]`
+
+> **✅ RESOLVED (2026-06-20, PR #43).** Added `.github/workflows/coverage-lint.yml` with two jobs:
+> a **`cargo llvm-cov`** coverage job (collects workspace coverage, prints a summary, uploads an lcov
+> artifact — report-only for now; a `--fail-under-*` gate can follow once a baseline is agreed), and an
+> **advisory `cargo dylint`** job (`continue-on-error`) running Trail of Bits' general-purpose lints
+> (configured in `[workspace.metadata.dylint]`). Advisory because the lints compile from git with their own
+> toolchain — a setup hiccup must not block the PR; findings surface in the job log.
 
 **Problem.** `cargo-llvm-cov` and `cargo-dylint` are not installed/wired (`cargo-audit` is, via `supply-chain.yml`).
 ToB used coverage to find untested branches (the error/abort arms negative tests miss) and Dylint for Rust

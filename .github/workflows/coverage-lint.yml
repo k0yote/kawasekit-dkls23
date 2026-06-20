@@ -1,0 +1,65 @@
+name: Coverage & lint
+
+# ToB-L3 (TOB tooling): wire two of ToB's standard tools into CI.
+#  - cargo-llvm-cov: coverage report (surfaces the untested error/abort arms that the
+#    hand-crafted negative tests miss). Report-only for now (no hard threshold) — a
+#    `--fail-under-*` gate can be added once a baseline is agreed.
+#  - cargo-dylint: runs Trail of Bits' general-purpose lints. ADVISORY (continue-on-error):
+#    the lints are compiled from git against their own toolchain, so a setup hiccup must
+#    never block the PR; findings show in the job log.
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '.github/workflows/coverage-lint.yml'
+  pull_request:
+    branches: [main, dev]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: cargo llvm-cov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+          override: true
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      - name: Collect coverage (workspace)
+        run: cargo llvm-cov --no-report --workspace
+      - name: Summary report
+        run: cargo llvm-cov report --summary-only
+      - name: lcov report
+        run: cargo llvm-cov report --lcov --output-path lcov.info
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: lcov.info
+
+  dylint:
+    name: cargo dylint (advisory)
+    runs-on: ubuntu-latest
+    # Advisory: ToB's general lints are compiled from git with their own toolchain; keep a
+    # setup/compile hiccup from blocking the PR. Findings still surface in the log.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-dylint + dylint-link
+        run: cargo install cargo-dylint dylint-link --locked
+      - name: cargo dylint (all configured libraries)
+        run: cargo dylint --all
