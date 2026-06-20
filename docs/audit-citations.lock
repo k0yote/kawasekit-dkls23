@@ -3,7 +3,7 @@
 # Re-run --update after intentionally changing a citation or a cited source line.
 dkls23-core/src/lib.rs:14	#[cfg(all(not(test), feature = "insecure-rng"))]
 dkls23-core/src/lib.rs:25	);
-dkls23-core/src/lib.rs:55	pub const PROTOCOL_VERSION: u16 = 1;
+dkls23-core/src/lib.rs:65	pub const PROTOCOL_VERSION: u16 = 1;
 dkls23-core/src/protocols.rs:23	#[cfg(any(test, feature = "trusted-dealer-import"))]
 dkls23-core/src/protocols.rs:62	pub fn new(value: u8) -> Result<Self, InvalidPartyIndex> {
 dkls23-core/src/protocols.rs:117	impl TryFrom<ParametersRaw> for Parameters {
@@ -104,22 +104,22 @@ dkls23-core/src/utilities/ot/base.rs:150	let m0 = tagged_hash(TAG_OT_BASE_MSG, &
 dkls23-core/src/utilities/ot/base.rs:267	///
 dkls23-core/src/utilities/ot/base.rs:284	
 dkls23-core/src/utilities/ot/base.rs:301	let value_for_mb = (*z * r).to_affine();
-dkls23-core/src/utilities/ot/extension.rs:268	&[session_id, &i_bytes, &count_bytes, &self.seeds[i as usize]],
-dkls23-core/src/utilities/ot/extension.rs:315	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi1", &msg])[0..(OT_SECURITY / 8) as usize],
-dkls23-core/src/utilities/ot/extension.rs:318	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi2", &msg])[0..(OT_SECURITY / 8) as usize],
-dkls23-core/src/utilities/ot/extension.rs:359	let consistent = verify_q
-dkls23-core/src/utilities/ot/extension.rs:362	.fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
-dkls23-core/src/utilities/ot/extension.rs:365	return Err(ErrorOT::consistency(
-dkls23-core/src/utilities/ot/extension.rs:368	}
-dkls23-core/src/utilities/ot/extension.rs:421	TAG_OTE_RANDOMIZE,
-dkls23-core/src/utilities/ot/extension.rs:429	v1.push(tagged_hash_as_scalar::<C>(
-dkls23-core/src/utilities/ot/extension.rs:808	let t_b_j = C::Scalar::conditional_select(
-dkls23-core/src/utilities/ot/extension.rs:838	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
-dkls23-core/src/utilities/ot/extension.rs:894	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
-dkls23-core/src/utilities/ot/extension.rs:923	let bit = (a[j as usize] >> k) & 1;
-dkls23-core/src/utilities/ot/extension.rs:927	}
-dkls23-core/src/utilities/ot/extension.rs:980	}
-dkls23-core/src/utilities/ot/extension.rs:1071	#[test]
+dkls23-core/src/utilities/ot/extension.rs:269	&[session_id, &i_bytes, &count_bytes, &self.seeds[i as usize]],
+dkls23-core/src/utilities/ot/extension.rs:316	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi1", &msg])[0..(OT_SECURITY / 8) as usize],
+dkls23-core/src/utilities/ot/extension.rs:319	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi2", &msg])[0..(OT_SECURITY / 8) as usize],
+dkls23-core/src/utilities/ot/extension.rs:364	let consistent = verify_q
+dkls23-core/src/utilities/ot/extension.rs:367	.fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
+dkls23-core/src/utilities/ot/extension.rs:370	return Err(ErrorOT::consistency(
+dkls23-core/src/utilities/ot/extension.rs:373	}
+dkls23-core/src/utilities/ot/extension.rs:426	TAG_OTE_RANDOMIZE,
+dkls23-core/src/utilities/ot/extension.rs:434	v1.push(tagged_hash_as_scalar::<C>(
+dkls23-core/src/utilities/ot/extension.rs:813	let t_b_j = C::Scalar::conditional_select(
+dkls23-core/src/utilities/ot/extension.rs:843	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
+dkls23-core/src/utilities/ot/extension.rs:899	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
+dkls23-core/src/utilities/ot/extension.rs:928	let bit = (a[j as usize] >> k) & 1;
+dkls23-core/src/utilities/ot/extension.rs:932	}
+dkls23-core/src/utilities/ot/extension.rs:985	}
+dkls23-core/src/utilities/ot/extension.rs:1076	#[test]
 dkls23-core/src/utilities/proofs.rs:233	let mut states: Zeroizing<Vec<C::Scalar>> = Zeroizing::new(Vec::with_capacity(R as usize));
 dkls23-core/src/utilities/proofs.rs:374	pub fn verify(proof: &DLogProof<C>, session_id: &[u8]) -> bool {
 dkls23-core/src/utilities/proofs.rs:387	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();

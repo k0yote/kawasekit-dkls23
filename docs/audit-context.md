@@ -32,6 +32,7 @@ reconstructing the secret key. It backs the `kawasekit-mpc-2p` 2-of-2 co-signer.
 - `#![forbid(unsafe_code)]` crate-wide.
 - Curve-generic over the `DklsCurve` marker trait (`curve.rs`); instantiated for `k256::Secp256k1` and `p256::NistP256`.
 - Crypto stack pinned to `k256` / `elliptic-curve` **0.14 release candidates** (deliberately frozen; see FORK.md).
+- **Security level (ToB-L1):** `RAW_SECURITY=KAPPA=256` is the OT-correlation/seed width, **not** a security claim; statistical soundness is `STAT_SECURITY=80`, KOS budget `OT_SECURITY=128+80=208`. **Computational** security tracks the curve (~128-bit), as DKLs23 intends; adequacy is paid-audit-reserved (`lib.rs` doc).
 
 ```
                         PUBLIC API (lib.rs re-exports)
@@ -75,7 +76,7 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 | ID | Class | What | Where (current lines) |
 |----|-------|------|------|
 | **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:17–49`, `multiplication.rs:126–173`, `signing.rs:649–665/857–873` |
-| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:923–927` |
+| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:928–932` |
 | **M2** | `[secret-hygiene]` | Zeroize the EncProof/CP witness-bearing commitment nonce | `proofs.rs:805/876` |
 | **M3** | `[keygen]` | Fast-refresh trivial-share guard + deferred-detection round-trip tests | `refresh.rs:1449/1540` |
 | **M4** | `[validation]` | `SignSession` finalizer always emits canonical low-S | `sign_session.rs:74/234` |
@@ -125,17 +126,19 @@ KOS + SoftSpokenOT VOLE + DKLs18 transfer + Fiat-Shamir. Constants: `KAPPA=256`,
 `OTESender{correlation:Vec<bool>, seeds}` / `OTEReceiver{seeds0, seeds1}` — **fully zeroized**, **persisted
 in `Party` and reused every signing session** (forced-reuse, `OT_WIDTH=4`).
 
-**THE consistency check** (`OTESender::run`, `:359–368`): constant-time GF(2²⁰⁸) fold over KAPPA columns;
+**THE consistency check** (`OTESender::run`, `:364–373`): constant-time GF(2²⁰⁸) fold over KAPPA columns;
 mismatch → `ErrorOT::consistency("Receiver cheated in OTE")` (kind `OtErrorKind::ConsistencyFailure`) →
-**ban trigger** (H1, 2nd round). Comparison is constant-time (`ct_eq` fold, `:359–362`); **`field_mul`
-(`:894–980`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:923–927`, M1, 2nd
-round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1071`).
+**ban trigger** (H1, 2nd round). The fold uses **`zip_eq`** (ToB-L4) over the two KAPPA-length vectors —
+a length divergence is a hard error, never a silent truncation (both are built by `0..KAPPA` loops over the
+length-checked `data.verify_t`, so it never panics). Comparison is constant-time (`ct_eq` fold, `:364–367`); **`field_mul`
+(`:899–985`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:928–932`, M1, 2nd
+round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1076`).
 **ToB-M1:** the three residual secret-choice-bit branches beyond `field_mul` are now also constant-time —
-`t_b` (`extension.rs:808`), the gadget fold `b` (`multiplication.rs:537`), and the `verify_u` entry
+`t_b` (`extension.rs:813`), the gadget fold `b` (`multiplication.rs:537`), and the `verify_u` entry
 (`multiplication.rs:674`) each compute both branches and `Choice`-select instead of `if bit { … }`
 (measured-timing verdict stays paid-audit-reserved).
-Session separation: `session_id` threaded into PRG (`:268`), chi (`:315/318`), randomize (`:421/429`).
-`cut_and_transpose` (`:838`) ported from Coinbase kryptology.
+Session separation: `session_id` threaded into PRG (`:269`), chi (`:316/319`), randomize (`:426/434`).
+`cut_and_transpose` (`:843`) ported from Coinbase kryptology.
 
 ### 3.3 ZK Proofs — `utilities/proofs.rs` (1275)
 - **DLog / Fischlin** (R=64, L=4, T=32): `prove` holds 64 nonces in `Zeroizing<Vec>` (H1, `:233`).
@@ -200,7 +203,7 @@ destruction). The in-core echo closes the honest-divergence case; a *malicious* 
 matching echo while signing under a different root still bans at phase 2 — full equivocation resistance is
 the authenticated-broadcast/transport layer's job (TOB-SILA-6/9/14, backend `kawasekit-mpc-2p`).
 
-**ToB-M2** (protocol-version handshake) — `sign_phase1` stamps the crate `PROTOCOL_VERSION` (`lib.rs:55`)
+**ToB-M2** (protocol-version handshake) — `sign_phase1` stamps the crate `PROTOCOL_VERSION` (`lib.rs:65`)
 into `TransmitPhase1to2` (`:422`); `sign_phase2` checks it against ours **before** any leak-bearing step
 (`:545` → `ProtocolVersionMismatch { counterparty, expected, got }`, recoverable). So two parties on
 incompatible library versions (e.g. one not yet carrying a security fix) abort early and identifiably
@@ -308,7 +311,7 @@ Verified distribution: **signing = 4 bans; DKG = 0; refresh = 0.**
 (`signing.rs:649–665/857–873`) and bans **only** on `ConsistencyFailure`. The two layers carry *inverted*
 `::new` defaults — `ErrorMul::new`→`ConsistencyFailure` (ban-safe), `ErrorOT::new`→`MalformedMessage` —
 reconciled by `ErrorMul::from_ot` propagating the OT kind 1:1. The two leak-bearing roots: mul `verify_r`
-(`multiplication.rs:694`) and the COTe consistency fold (`extension.rs:365`). A malformed-*dimension*
+(`multiplication.rs:694`) and the COTe consistency fold (`extension.rs:370`). A malformed-*dimension*
 message is now **recoverable**, not a ban.
 
 ---
@@ -332,7 +335,7 @@ witness commitment nonce** (`Zeroizing`, M2), re_key secret + polynomial (`Zeroi
 
 Ranked by concentration of subtle invariants × attacker reachability:
 
-1. **OTE consistency check + forced-reuse** (`extension.rs:359–368`) — sole gate protecting reused
+1. **OTE consistency check + forced-reuse** (`extension.rs:364–373`) — sole gate protecting reused
    correlations; constant-time compare **and** (after M1) constant-time `field_mul`; the ban it raises is
    now kind-tagged (H1); session-separation rests on unique caller `session_id`.
 2. **Signing u/v/γ consistency + signature assembly** (`signing.rs:846–907,976–1070`) — deferred-inversion
@@ -372,7 +375,7 @@ Ranked by concentration of subtle invariants × attacker reachability:
 | DKG / refresh bans | `grep -c Abort::ban` | 0 / 0 ✓ |
 | Ban is kind-aware (H1) | read `signing.rs:649–665/857–873` | `match error.kind` ✓ |
 | Error `kind` machinery (H1) | read `ot.rs:17–49`, `multiplication.rs:126–173` | `OtErrorKind`/`MulErrorKind` + `from_ot` 1:1 ✓ |
-| `field_mul` constant-time (M1) | read `extension.rs:923–927` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
+| `field_mul` constant-time (M1) | read `extension.rs:928–932` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
 | EncProof nonce zeroized (M2) | `grep Zeroizing proofs.rs` | `:805` (deref `:876`) ✓ |
 | SignSession low-S default (M4) | read `sign_session.rs:74/234` | always `!s.is_high()` ✓ |
 | M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:1010` (after `ZeroDenominator` `:995`) ✓ |
@@ -381,6 +384,10 @@ Ranked by concentration of subtle invariants × attacker reachability:
 | M3 fast-path tested | `grep 'fn test' refresh.rs` | `:1449`, `:1540` ✓ |
 | M1 identity rejection (1st round) | `grep identity proofs.rs` | `:388` (DLog), `:667` (CP/Enc) ✓ |
 | `ct_eq` usage breadth | `grep -rl ct_eq` | commits, proofs, extension, multiplication ✓ |
+| γ_v ban negative test (ToB-L2) | `grep gamma_v signing.rs` tests | `test_sign_phase3_bans_on_inconsistent_gamma_v` → `OtConsistencyCheckFailed` ✓ |
+| base-OT `s≠0` invariant test (ToB-L2) | `grep sender_secret_is_nonzero base.rs` | guard exercised over draws ✓ |
+| proptest introduced (ToB-L2) | `grep -rn proptest! src/` | PartyIndex / Parameters / hex-parse property tests ✓ |
+| COTe fold uses `zip_eq` (ToB-L4) | `grep zip_eq extension.rs` | length-safe fold, never silent-truncates ✓ |
 
 ---
 
