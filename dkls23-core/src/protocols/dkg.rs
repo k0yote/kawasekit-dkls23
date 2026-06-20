@@ -213,6 +213,10 @@ pub struct KeepInitMulPhase3to4<C: DklsCurve> {
 pub struct BroadcastDerivationPhase2to4 {
     pub sender_index: PartyIndex,
     pub cc_commitment: HashOutput,
+    /// DKG extension of ToB-M2 (TOB-SILA-11a): the sender's library `PROTOCOL_VERSION`,
+    /// cross-checked in phase 4 so two parties on incompatible versions abort early and
+    /// identifiably (`ProtocolVersionMismatch`) at keygen instead of an opaque later failure.
+    pub protocol_version: u16,
 }
 
 /// Broadcast - Initialization for key derivation.
@@ -561,6 +565,7 @@ pub fn phase2<C: DklsCurve>(
     let bip_broadcast = BroadcastDerivationPhase2to4 {
         sender_index: data.party_index,
         cc_commitment,
+        protocol_version: crate::PROTOCOL_VERSION,
     };
 
     (
@@ -772,6 +777,26 @@ pub fn phase4<C: DklsCurve>(
     bip_received_phase3: &BTreeMap<PartyIndex, BroadcastDerivationPhase3to4>,
     address_fn: impl Fn(&C::AffinePoint) -> String,
 ) -> Result<(Party<C>, PublicKeyPackage<C>), Abort> {
+    // DKG extension of ToB-M2 (TOB-SILA-11a): reject a counterparty on an incompatible protocol
+    // version BEFORE assembling the keyshare, with a dedicated, identifiable reason — so a
+    // cross-version keygen (e.g. one party not yet carrying a security fix) aborts clearly at the
+    // source instead of degrading to an opaque later consistency/proof failure (or a downstream
+    // ban). The signing path carries the same check (ToB-M2); cross-party *root agreement* is
+    // delegated to the signing-side H1 echo (`RootAgreementMismatch`), which prevents any signing
+    // under a divergent assembled root, so no extra DKG round is added here.
+    for broadcast in bip_received_phase2.values() {
+        if broadcast.protocol_version != crate::PROTOCOL_VERSION {
+            return Err(Abort::recoverable(
+                data.party_index,
+                AbortReason::ProtocolVersionMismatch {
+                    counterparty: broadcast.sender_index,
+                    expected: crate::PROTOCOL_VERSION,
+                    got: broadcast.protocol_version,
+                },
+            ));
+        }
+    }
+
     // DKG
     let (pk, verifying_shares) = step5::<C>(
         &data.parameters,
@@ -1341,6 +1366,45 @@ mod tests {
         assert!(matches!(
             abort.reason,
             AbortReason::WrongMessageCount { .. }
+        ));
+    }
+
+    /// DKG extension of ToB-M2: phase 4 must reject a counterparty advertising an incompatible
+    /// protocol version with a dedicated, identifiable abort — caught at keygen (before the
+    /// keyshare is assembled), not as an opaque later failure.
+    #[test]
+    fn test_dkg_phase4_rejects_protocol_version_mismatch() {
+        let mut data = setup_two_party_dkg_phase4_inputs();
+        let p2 = PartyIndex::new(2).unwrap();
+        data.bip_broadcast_2to4
+            .get_mut(&p2)
+            .unwrap()
+            .protocol_version = crate::PROTOCOL_VERSION + 1;
+
+        let result = phase4::<TestCurve>(
+            &data.all_data[0],
+            &data.poly_points[0],
+            &data.proofs_commitments,
+            &data.zero_kept_3to4[0],
+            &data.zero_received_2to4[0],
+            &data.zero_received_3to4[0],
+            &data.mul_kept_3to4[0],
+            &data.mul_received_3to4[0],
+            &data.bip_broadcast_2to4,
+            &data.bip_broadcast_3to4,
+            no_address,
+        );
+        let abort = result.expect_err("a protocol-version mismatch must abort DKG");
+        assert!(matches!(
+            abort.kind,
+            crate::protocols::AbortKind::Recoverable
+        ));
+        assert!(matches!(
+            abort.reason,
+            AbortReason::ProtocolVersionMismatch { counterparty, expected, got }
+                if counterparty == p2
+                    && expected == crate::PROTOCOL_VERSION
+                    && got == crate::PROTOCOL_VERSION + 1
         ));
     }
 

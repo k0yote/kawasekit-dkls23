@@ -19,13 +19,16 @@ dkls23-core/src/protocols/derivation.rs:172	let new_poly_point = self.poly_point
 dkls23-core/src/protocols/derivation.rs:174	let new_pk = ((generator * tweak) + self.pk).to_affine();
 dkls23-core/src/protocols/derivation.rs:349	let new_verifying_shares = self
 dkls23-core/src/protocols/derivation.rs:353	.collect();
-dkls23-core/src/protocols/dkg.rs:349	// L3 (self-audit): this `.expect` is an RNG-sanity fail-stop, NOT an attacker-reachable panic.
-dkls23-core/src/protocols/dkg.rs:411	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
-dkls23-core/src/protocols/dkg.rs:453	} else if pk != current_pk {
-dkls23-core/src/protocols/dkg.rs:1020	// In DKG this failed run does not produce reusable OT state,
-dkls23-core/src/protocols/dkg.rs:1021	// so we keep abort classification recoverable.
-dkls23-core/src/protocols/dkg.rs:1075	// We check the commitments and create the final chain code.
-dkls23-core/src/protocols/dkg.rs:1110	}
+dkls23-core/src/protocols/dkg.rs:219	pub protocol_version: u16,
+dkls23-core/src/protocols/dkg.rs:353	// L3 (self-audit): this `.expect` is an RNG-sanity fail-stop, NOT an attacker-reachable panic.
+dkls23-core/src/protocols/dkg.rs:415	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
+dkls23-core/src/protocols/dkg.rs:457	} else if pk != current_pk {
+dkls23-core/src/protocols/dkg.rs:568	protocol_version: crate::PROTOCOL_VERSION,
+dkls23-core/src/protocols/dkg.rs:787	for broadcast in bip_received_phase2.values() {
+dkls23-core/src/protocols/dkg.rs:1045	// In DKG this failed run does not produce reusable OT state,
+dkls23-core/src/protocols/dkg.rs:1046	// so we keep abort classification recoverable.
+dkls23-core/src/protocols/dkg.rs:1100	// We check the commitments and create the final chain code.
+dkls23-core/src/protocols/dkg.rs:1135	}
 dkls23-core/src/protocols/re_key.rs:63	let secret_key = Zeroizing::new(*secret_key);
 dkls23-core/src/protocols/re_key.rs:72	let mut polynomial: Zeroizing<Vec<C::Scalar>> =
 dkls23-core/src/protocols/re_key.rs:134	let mut all_mul_receivers: Vec<BTreeMap<PartyIndex, MulReceiver<C>>> =
