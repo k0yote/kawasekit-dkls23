@@ -1,5 +1,7 @@
-# Contributing to DKLs23
+# Contributing to kawasekit-dkls23
 First off, thank you for considering contributing to our project! We appreciate your time and effort.
+
+> This is kawasekit's hardened fork of [0xCarbon/DKLs23](https://github.com/0xCarbon/DKLs23) — see [FORK.md](FORK.md). Contributions go to this fork, not upstream.
 
 ## Table of Contents
 
@@ -20,14 +22,14 @@ First off, thank you for considering contributing to our project! We appreciate 
 ## How to Contribute
 
 ### Reporting Bugs
-If you find a bug, please report it by opening an issue on our [GitHub Issues](https://github.com/0xCarbon/DKLs23/issues) page. Include the following details:
+If you find a bug, please report it by opening an issue on our [GitHub Issues](https://github.com/k0yote/kawasekit-dkls23/issues) page. Include the following details:
 - A clear and descriptive title.
 - A detailed description of the issue.
 - Steps to reproduce the issue.
 - Any relevant logs or screenshots.
 
 ### Suggesting Enhancements
-We welcome suggestions for new features or improvements. Please open an issue on our [GitHub Issues](https://github.com/0xCarbon/DKLs23/issues) page and describe your idea in detail. Include:
+We welcome suggestions for new features or improvements. Please open an issue on our [GitHub Issues](https://github.com/k0yote/kawasekit-dkls23/issues) page and describe your idea in detail. Include:
 - A clear and descriptive title.
 - A detailed description of the enhancement.
 - Any relevant examples or use cases.
@@ -62,7 +64,8 @@ Once Rust is installed, you can clone the repository:
 1. Open a terminal.
 2. Run the following commands:
 ```bash
-git clone https://github.com/0xCarbon/DKLs23 cd DKLs23
+git clone https://github.com/k0yote/kawasekit-dkls23
+cd kawasekit-dkls23
 ```
 ### Installing Dependencies
 This project uses Cargo, Rust's package manager, to manage dependencies. To install the necessary dependencies, run:
