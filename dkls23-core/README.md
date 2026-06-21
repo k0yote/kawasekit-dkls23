@@ -1,7 +1,7 @@
 # dkls23-core
 
-[![Crates.io](https://img.shields.io/crates/v/dkls23-core.svg)](https://crates.io/crates/dkls23-core)
-[![docs.rs](https://docs.rs/dkls23-core/badge.svg)](https://docs.rs/dkls23-core)
+> Part of [**kawasekit-dkls23**](../README.md), a hardened fork of [0xCarbon/DKLs23](https://github.com/0xCarbon/DKLs23).
+> **UNAUDITED — testnet / no-value only.** Not published to crates.io; consumed by git rev. See [FORK.md](../FORK.md) and [SECURITY.md](../SECURITY.md).
 
 Curve-generic core implementation of the [DKLs23](https://eprint.iacr.org/2023/765.pdf) Threshold ECDSA protocol.
 
@@ -16,14 +16,14 @@ This crate provides the cryptographic primitives and protocol logic for:
 
 This is the curve-generic core — most users should depend on a curve-specific crate instead:
 
-- [`dkls23-secp256k1`](https://crates.io/crates/dkls23-secp256k1) — for Ethereum, Bitcoin, Cosmos, TRON
-- [`dkls23-secp256r1`](https://crates.io/crates/dkls23-secp256r1) — for NEO3, Sui
+- [`dkls23-secp256k1`](../dkls23-secp256k1/) — for Ethereum, Bitcoin, Cosmos, TRON
+- [`dkls23-secp256r1`](../dkls23-secp256r1/) — for NEO3, Sui
 
 Use `dkls23-core` directly only if you need to implement a custom curve via the `DklsCurve` trait.
 
 ```toml
 [dependencies]
-dkls23-core = "0.5"
+dkls23-core = { git = "https://github.com/k0yote/kawasekit-dkls23", rev = "<commit-sha>" }
 ```
 
 ## API Levels
@@ -31,7 +31,7 @@ dkls23-core = "0.5"
 - **High-level:** `DkgSession` and `SignSession` manage protocol state automatically
 - **Low-level:** `phase1`–`phase4` functions and keep-state types for advanced resumable/stateless orchestration
 
-For session orchestration, transport, and resumable flows, see [libtss](https://github.com/0xCarbon/libtss).
+Session orchestration, transport, and resumable flows are the responsibility of the consuming application and are out of scope for this crate.
 
 ## License
 

@@ -18,7 +18,7 @@ Open findings are tracked in issue [#13](https://github.com/k0yote/kawasekit-dkl
 (filter by the [`audit`](https://github.com/k0yote/kawasekit-dkls23/issues?q=is%3Aissue+label%3Aaudit) label).
 
 ## Reporting a Vulnerability
-If you discover a security vulnerability, please report it to us in a responsible manner. To report a vulnerability, please email us at [fabio@bealore.com]. Include the following details in your report:
+If you discover a security vulnerability, please report it privately — **do not open a public issue**. Use GitHub's private vulnerability reporting on this repository (**Security → Report a vulnerability**, or open the form at <https://github.com/k0yote/kawasekit-dkls23/security/advisories/new>). Include the following details in your report:
 - A description of the vulnerability
 - Steps to reproduce the vulnerability
 - Any potential impact of the vulnerability
