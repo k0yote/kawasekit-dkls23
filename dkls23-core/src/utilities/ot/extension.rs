@@ -241,7 +241,9 @@ impl OTESender {
             }
         }
         if self.correlation.len() != KAPPA as usize || self.seeds.len() != KAPPA as usize {
-            return Err(ErrorOT::malformed("OTE sender state has incorrect dimensions"));
+            return Err(ErrorOT::malformed(
+                "OTE sender state has incorrect dimensions",
+            ));
         }
         if data.u.len() != KAPPA as usize || data.verify_t.len() != KAPPA as usize {
             return Err(ErrorOT::malformed("OTE data has incorrect dimensions"));
@@ -545,7 +547,9 @@ impl OTEReceiver {
         choice_bits: &[bool],
     ) -> Result<(Vec<PRGOutput>, OTEDataToSender), ErrorOT> {
         if choice_bits.len() != BATCH_SIZE as usize {
-            return Err(ErrorOT::malformed("Choice bits vector has incorrect length"));
+            return Err(ErrorOT::malformed(
+                "Choice bits vector has incorrect length",
+            ));
         }
         if self.seeds0.len() != KAPPA as usize || self.seeds1.len() != KAPPA as usize {
             return Err(ErrorOT::malformed(
@@ -738,7 +742,9 @@ impl OTEReceiver {
         // our final result will be ot_width times the usual result we would get.
         // But first, we check that the sender gave us a message with the correct length.
         if choice_bits.len() != BATCH_SIZE as usize {
-            return Err(ErrorOT::malformed("Choice bits vector has incorrect length"));
+            return Err(ErrorOT::malformed(
+                "Choice bits vector has incorrect length",
+            ));
         }
         if extended_seeds.len() != KAPPA as usize {
             return Err(ErrorOT::malformed(
