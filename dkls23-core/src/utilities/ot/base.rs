@@ -131,7 +131,7 @@ impl<C: DklsCurve> OTSender<C> {
 
         // h is already in enc_proof, but we check if the values agree.
         if !verification || (h != enc_proof.proof0.base_h) {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "Receiver cheated in OT: Encryption proof failed!",
             ));
         }
@@ -167,7 +167,7 @@ impl<C: DklsCurve> OTSender<C> {
         enc_proofs: &[EncProof<C>],
     ) -> Result<(Vec<HashOutput>, Vec<HashOutput>), ErrorOT> {
         let batch_size = u16::try_from(enc_proofs.len())
-            .map_err(|_| ErrorOT::new("Batch size exceeds maximum (65535)"))?;
+            .map_err(|_| ErrorOT::malformed("Batch size exceeds maximum (65535)"))?;
 
         let mut vec_m0: Vec<HashOutput> = Vec::with_capacity(batch_size as usize);
         let mut vec_m1: Vec<HashOutput> = Vec::with_capacity(batch_size as usize);
@@ -236,7 +236,7 @@ impl OTReceiver {
         bits: &[bool],
     ) -> Result<(Vec<C::Scalar>, Vec<EncProof<C>>), ErrorOT> {
         let batch_size = u16::try_from(bits.len())
-            .map_err(|_| ErrorOT::new("Batch size exceeds maximum (65535)"))?;
+            .map_err(|_| ErrorOT::malformed("Batch size exceeds maximum (65535)"))?;
 
         let mut vec_r: Vec<C::Scalar> = Vec::with_capacity(batch_size as usize);
         let mut vec_proof: Vec<EncProof<C>> = Vec::with_capacity(batch_size as usize);
@@ -277,7 +277,7 @@ impl OTReceiver {
         let verification = DLogProof::<C>::verify(dlog_proof, session_id);
 
         if !verification {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "Sender cheated in OT: Proof of discrete logarithm failed!",
             ));
         }
@@ -324,7 +324,7 @@ impl OTReceiver {
 
         // Step 2
         let batch_size = u16::try_from(vec_r.len())
-            .map_err(|_| ErrorOT::new("Batch size exceeds maximum (65535)"))?;
+            .map_err(|_| ErrorOT::malformed("Batch size exceeds maximum (65535)"))?;
 
         let mut vec_mb: Vec<HashOutput> = Vec::with_capacity(batch_size as usize);
         for i in 0..batch_size {

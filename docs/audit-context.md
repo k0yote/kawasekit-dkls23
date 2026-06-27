@@ -75,16 +75,16 @@ DKG (DKLs19 Protocol 9.1) → Proofs (Schnorr/Fischlin, Chaum-Pedersen, EncProof
 
 | ID | Class | What | Where (current lines) |
 |----|-------|------|------|
-| **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:17–49`, `multiplication.rs:126–173`, `signing.rs:649–665/857–873` |
-| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:928–932` |
+| **H1** | `[abort]` | Machine-readable error `kind` so signing bans **only** on a leak-bearing consistency failure | `ot.rs:18–51`, `multiplication.rs:126–174`, `signing.rs:658–674/866–882` |
+| **M1** | `[OT]` | Constant-time GF(2²⁰⁸) `field_mul` comb (bit-mask, not a data-dependent branch) | `extension.rs:934–938` |
 | **M2** | `[secret-hygiene]` | Zeroize the EncProof/CP witness-bearing commitment nonce | `proofs.rs:805/876` |
 | **M3** | `[keygen]` | Fast-refresh trivial-share guard + deferred-detection round-trip tests | `refresh.rs:1449/1540` |
 | **M4** | `[validation]` | `SignSession` finalizer always emits canonical low-S | `sign_session.rs:74/234` |
 | **M5** | `[supply-chain]` | Yanked-crate / advisory runbook step (docs only) | `FORK.md`, `docs/security.md` |
-| **M6** | `[rust-safety]` | Up-front `x_coord` hex validation in `sign_phase4` (typed abort, not `.expect`) | `signing.rs:1007–1015` |
+| **M6** | `[rust-safety]` | Up-front `x_coord` hex validation in `sign_phase4` (typed abort, not `.expect`) | `signing.rs:1016–1024` |
 | **L1** | `[ssid]` | Enforce canonical `ID_LEN`=32 `session_id`/`sign_id` at signing entry | `signing.rs:276–283` |
 | **L3** | `[rust-safety]` | Document the Fischlin `.expect` as an RNG fail-stop (not attacker-reachable) | `dkg.rs:353`, `base.rs:85` |
-| **L4** | `[OT]` | Document public-gadget agreement (a mismatch is caught downstream by `verify_r`) | `multiplication.rs:217/476` |
+| **L4** | `[OT]` | Document public-gadget agreement (a mismatch is caught downstream by `verify_r`) | `multiplication.rs:218/477` |
 
 *Second-round items closed by docs/tests only (no protocol-math change): M5, L3, L4. **L2** (wasm `getrandom`
 backend) is tracked in the `kawasekit-mpc-2p` repo — out of scope for `dkls23-core`. All protocol math is
@@ -126,19 +126,19 @@ KOS + SoftSpokenOT VOLE + DKLs18 transfer + Fiat-Shamir. Constants: `KAPPA=256`,
 `OTESender{correlation:Vec<bool>, seeds}` / `OTEReceiver{seeds0, seeds1}` — **fully zeroized**, **persisted
 in `Party` and reused every signing session** (forced-reuse, `OT_WIDTH=4`).
 
-**THE consistency check** (`OTESender::run`, `:364–373`): constant-time GF(2²⁰⁸) fold over KAPPA columns;
+**THE consistency check** (`OTESender::run`, `:366–375`): constant-time GF(2²⁰⁸) fold over KAPPA columns;
 mismatch → `ErrorOT::consistency("Receiver cheated in OTE")` (kind `OtErrorKind::ConsistencyFailure`) →
 **ban trigger** (H1, 2nd round). The fold uses **`zip_eq`** (ToB-L4) over the two KAPPA-length vectors —
 a length divergence is a hard error, never a silent truncation (both are built by `0..KAPPA` loops over the
-length-checked `data.verify_t`, so it never panics). Comparison is constant-time (`ct_eq` fold, `:364–367`); **`field_mul`
-(`:899–985`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:928–932`, M1, 2nd
-round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1076`).
+length-checked `data.verify_t`, so it never panics). Comparison is constant-time (`ct_eq` fold, `:366–369`); **`field_mul`
+(`:905–991`) is now constant-time** — the comb uses a `0u64.wrapping_sub(bit)` mask (`:934–938`, M1, 2nd
+round), not a data-dependent branch; pinned by `test_field_mul_identity` (`:1082`).
 **ToB-M1:** the three residual secret-choice-bit branches beyond `field_mul` are now also constant-time —
-`t_b` (`extension.rs:813`), the gadget fold `b` (`multiplication.rs:537`), and the `verify_u` entry
-(`multiplication.rs:674`) each compute both branches and `Choice`-select instead of `if bit { … }`
+`t_b` (`extension.rs:819`), the gadget fold `b` (`multiplication.rs:538`), and the `verify_u` entry
+(`multiplication.rs:675`) each compute both branches and `Choice`-select instead of `if bit { … }`
 (measured-timing verdict stays paid-audit-reserved).
-Session separation: `session_id` threaded into PRG (`:269`), chi (`:316/319`), randomize (`:426/434`).
-`cut_and_transpose` (`:843`) ported from Coinbase kryptology.
+Session separation: `session_id` threaded into PRG (`:271`), chi (`:318/321`), randomize (`:428/436`).
+`cut_and_transpose` (`:849`) ported from Coinbase kryptology.
 
 ### 3.3 ZK Proofs — `utilities/proofs.rs` (1275)
 - **DLog / Fischlin** (R=64, L=4, T=32): `prove` holds 64 nonces in `Zeroizing<Vec>` (H1, `:233`).
@@ -157,9 +157,9 @@ in `Zeroizing` (`:805`, deref `&*` at `:876`), mirroring `DLogProof::prove`. *Op
 DKLs19 Protocol 1. `L=2`, `OT_WIDTH=4`. `MulSender{public_gadget, ote_sender}` / `MulReceiver{public_gadget,
 ote_receiver}` — persisted in `Party`, reused every session. Correlation **I-RVOLE**:
 `output_A[i] + output_B[i] == input[i]·b`.
-**THE verify_r consistency check** (`run_phase2`, `:693` `ct_eq`) → **ban trigger** (`ErrorMul` carries
-`MulErrorKind`; this raises `ConsistencyFailure`, `:694`). `chi_tilde/chi_hat`
-derived by Fiat-Shamir from the receiver's transcript (`:348–359` sender ≡ `:575–586` receiver).
+**THE verify_r consistency check** (`run_phase2`, `:694` `ct_eq`) → **ban trigger** (`ErrorMul` carries
+`MulErrorKind`; this raises `ConsistencyFailure`, `:695`). `chi_tilde/chi_hat`
+derived by Fiat-Shamir from the receiver's transcript (`:349–360` sender ≡ `:576–587` receiver).
 `gamma_sender` is **not** independently authenticated here — signing adds the γ_u/γ_v cross-check.
 **L4 (2nd round, documented):** `public_gadget` equality across parties is **not asserted at runtime**;
 `tau` is not authenticated by OTE — both are caught downstream by `verify_r`.
@@ -177,12 +177,13 @@ DKLs19 Protocol 9.1: 4 phases + 5 steps. `step1` sample degree-`t−1` poly → 
 indices → `step3` sum fragments into `poly_point`, `prove_commit` DLog of `P(i)` → `step5` decommit+verify,
 **Lagrange-in-exponent** PK reconstruction (`:415–457`) with contiguous-window consistency. `phase4`
 trivial-PK (`pk ∉ {identity, generator}`) + trivial-share (`poly_point ∉ {0,1}`) guards, then assembles
-`Party`. Chain code = **committed XOR** of all parties' aux codes (`:1100–1135`, unbiasable).
+`Party`. Chain code = **committed XOR** of all parties' aux codes (`:1102–1137`, unbiasable).
 **All DKG aborts are `recoverable`** (`Abort::ban` count = **0**) — a failed mul-init produces no reusable
-OT state, so the ban discipline does not apply yet (explicit comment `:1045–1046`).
+OT state, so the ban discipline does not apply yet (explicit comment `:1047–1048`).
 **ToB-M2 at DKG:** `phase2` stamps the crate `PROTOCOL_VERSION` into `BroadcastDerivationPhase2to4`
 (`:219`, `:568`); `phase4` cross-checks it before assembling the keyshare (`:787` → `ProtocolVersionMismatch`,
-recoverable) so a cross-version keygen aborts early at the source. Cross-party **root agreement** (ToB-H1) is
+recoverable, attributed to the **routing identity** — the map key the broadcast was filed under, not the
+self-claimed `sender_index` (issue #48)) so a cross-version keygen aborts early at the source. Cross-party **root agreement** (ToB-H1) is
 **delegated to the signing-side echo** (`RootAgreementMismatch`), which prevents any signing under a divergent
 assembled root — so no extra DKG echo round is added (the assembled root is only known at `phase4`, and a
 dedicated DKG agreement round would change the round count / wire format for no safety gain over the
@@ -191,18 +192,18 @@ signing-side gate).
 ### 3.7 Signing — `protocols/signing.rs` (2440) — the linchpin
 DKLs23 Protocol 3.6, 4 phases. Nonce `k` and inversion mask `φ` sampled (`:342–343`); `R_i = k·G` committed.
 The **deferred-inversion trick**: `k⁻¹` is never computed on a secret — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`
-materializes only on public aggregated scalars (`:1017`), then independently re-verified
-(`verify_ecdsa_signature`, `:1028`). Recovery id = 2-bit (y-parity | x-reduced) (`:1068`) — **not**
+materializes only on public aggregated scalars (`:1026`), then independently re-verified
+(`verify_ecdsa_signature`, `:1037`). Recovery id = 2-bit (y-parity | x-reduced) (`:1077`) — **not**
 EIP-155 `v`. Two 2nd-round entry guards: **L1** — `session_id`/`sign_id` must be `ID_LEN`=32 at
 `sign_phase1` entry (`:276–283` → `MalformedSessionId`, recoverable); **M6** — `x_coord` hex re-validated
-up front in `sign_phase4` (`:1007–1015` → `InvalidXCoordinateHex`, recoverable), placed **after** the
-zero-denominator check (`:992`). Low-s: `Party::sign_phase4` keeps the `normalize` flag, but
+up front in `sign_phase4` (`:1016–1024` → `InvalidXCoordinateHex`, recoverable), placed **after** the
+zero-denominator check (`:1001`). Low-s: `Party::sign_phase4` keeps the `normalize` flag, but
 `SignSession::phase4` **always** requests canonical low-S (M4; asserted `!s.is_high()`, `sign_session.rs:234`).
 
 **ToB-H1** (chain-code / session-id cross-party *agreement*) — `sign_phase1` broadcasts a Fiat-Shamir
 echo `root_digest = tagged_hash(TAG_ROOT_AGREEMENT, [session_id ‖ sign_id ‖ chain_code])` on
 `TransmitPhase1to2` (`:358`); `sign_phase2` constant-time cross-checks every counterparty's echo against
-its own (`:566–578` → `RootAgreementMismatch`, **recoverable + identifiable**) **before** the leak-bearing
+its own (`:601–613` → `RootAgreementMismatch`, **recoverable + identifiable**) **before** the leak-bearing
 mul. DKG only *binds* each aux chain code (commit-vs-open) but never cross-verifies the *assembled* root,
 and `session_id` enters the keyshare unchecked — so without this echo two honest parties left with
 divergent-but-valid views would only diverge at the phase-2 COTe check and **ban each other** (key
@@ -212,10 +213,17 @@ the authenticated-broadcast/transport layer's job (TOB-SILA-6/9/14, backend `kaw
 
 **ToB-M2** (protocol-version handshake) — `sign_phase1` stamps the crate `PROTOCOL_VERSION` (`lib.rs:65`)
 into `TransmitPhase1to2` (`:422`); `sign_phase2` checks it against ours **before** any leak-bearing step
-(`:545` → `ProtocolVersionMismatch { counterparty, expected, got }`, recoverable). So two parties on
+(`:580` → `ProtocolVersionMismatch { counterparty, expected, got }`, recoverable). So two parties on
 incompatible library versions (e.g. one not yet carrying a security fix) abort early and identifiably
 instead of degrading to an opaque later consistency/proof failure or a ban. Bump `PROTOCOL_VERSION` on any
 wire/transcript-incompatible change.
+
+**Sender-validated attribution (issue #48)** — both the M2 (version) and H1 (root) identifiability checks
+in `sign_phase2` now run **after** the message-routing validation
+(`UnexpectedSender`/`MisroutedMessage`/`DuplicateSender`), so they attribute their recoverable abort to a
+*routing-validated* counterparty (∈ counterparties, addressed to us, non-duplicate) — not a spoofed,
+self-claimed sender — while staying strictly before any leak-bearing OT/mul step. Cryptographic *binding*
+of a message to its sender stays the transport's job (TOB-SILA-6/9/14, backend).
 
 **Complete ban-vs-recoverable map** (verified: **4 ban, 33 recoverable**). The two mul bans are now
 **kind-aware** — they `match error.kind` and ban only on `ConsistencyFailure`, downgrading
@@ -223,16 +231,16 @@ wire/transcript-incompatible change.
 
 | Kind | Line | Trigger | Reason |
 |------|------|---------|--------|
-| **BAN** | `:650` | `mul_sender.run` Err with `kind==ConsistencyFailure` (phase 2) | `MultiplicationVerificationFailed` |
-| **BAN** | `:858` | `mul_receiver.run_phase2` Err `ConsistencyFailure` — the leak-bearing `verify_r` (phase 3) | `MultiplicationVerificationFailed` |
-| **BAN** | `:886` | `R_j·chi ≠ d_u·G + gamma_u` (phase 3) | `GammaUInconsistency` |
-| **BAN** | `:898` | `pk_j·chi ≠ d_v·G + gamma_v` (phase 3) | `OtConsistencyCheckFailed` |
+| **BAN** | `:659` | `mul_sender.run` Err with `kind==ConsistencyFailure` (phase 2) | `MultiplicationVerificationFailed` |
+| **BAN** | `:867` | `mul_receiver.run_phase2` Err `ConsistencyFailure` — the leak-bearing `verify_r` (phase 3) | `MultiplicationVerificationFailed` |
+| **BAN** | `:895` | `R_j·chi ≠ d_u·G + gamma_u` (phase 3) | `GammaUInconsistency` |
+| **BAN** | `:907` | `pk_j·chi ≠ d_v·G + gamma_v` (phase 3) | `OtConsistencyCheckFailed` |
 | recoverable | `:636/:844` | mul Err with `kind==MalformedMessage` (phases 2/3) | `MultiplicationVerificationFailed` |
-| recoverable | `:545` | counterparty's `protocol_version` ≠ ours — **before** any leak-bearing step (ToB-M2) | `ProtocolVersionMismatch` |
-| recoverable | `:573` | counterparty's root echo ≠ ours — chain-code/session-id disagreement, **before** any leak-bearing mul (ToB-H1) | `RootAgreementMismatch` |
+| recoverable | `:580` | counterparty's `protocol_version` ≠ ours — **before** any leak-bearing step (ToB-M2) | `ProtocolVersionMismatch` |
+| recoverable | `:608` | counterparty's root echo ≠ ours — chain-code/session-id disagreement, **before** any leak-bearing mul (ToB-H1) | `RootAgreementMismatch` |
 | recoverable | `:397` | `mul_receiver.run_phase1` Err — no leak-bearing check has run yet | `MultiplicationVerificationFailed` |
 | recoverable | `:279` | `session_id`/`sign_id` length ≠ `ID_LEN` (L1) | `MalformedSessionId` |
-| recoverable | `:1010` | `x_coord` not valid field-length hex (M6) | `InvalidXCoordinateHex` |
+| recoverable | `:1019` | `x_coord` not valid field-length hex (M6) | `InvalidXCoordinateHex` |
 | recoverable | many | party-set / routing / commitment / signature-verify failures | various |
 
 ### 3.8 Refresh — `protocols/refresh.rs` (2384)
@@ -276,9 +284,9 @@ recovery_id:u8}` is a public value type, no zeroize (signature is public).
 
 **Correctness**
 - **I-KEYGEN** — group key = Lagrange-in-exponent of fragments; every contiguous `t`-window must agree (`dkg.rs:415–457` → `PolynomialInconsistency`); `verifying_share[i] == poly_point_i·G`.
-- **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:882`).
+- **I-RVOLE** — `output_A + output_B == input·b` (`multiplication.rs:883`).
 - **I-ZEROSHARE** — `Σ ζ_i == 0` over the signer set (`zero_shares.rs:79,123–127`).
-- **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:1017`); re-verified (`:1028`).
+- **I-SIG** — `s = Σw/Σu = k⁻¹(H(m)+sk·r)`; inversion deferred to public scalars (`signing.rs:1026`); re-verified (`:1037`).
 - **I-DERIVE** — same public `tweak` added to every share shifts `sk→sk+tweak`, `pk→pk+tweak·G` (`derivation.rs:172–174,349–353`).
 - **I-REFRESH** — correction polynomial has constant term 0 → `pk` preserved; correction-pk == identity enforced (`refresh.rs:411/896`).
 
@@ -315,10 +323,11 @@ Verified distribution: **signing = 4 bans; DKG = 0; refresh = 0.**
 **Resolved in the 2nd round (was a flagged structural fact):** the ban formerly discriminated by `Result`
 *presence* only — any `Err` banned. H1 gave `ErrorOT`/`ErrorMul` a machine-readable `kind`
 (`OtErrorKind`/`MulErrorKind` ∈ {`ConsistencyFailure`, `MalformedMessage`}); signing now `match`es on it
-(`signing.rs:649–665/857–873`) and bans **only** on `ConsistencyFailure`. The two layers carry *inverted*
-`::new` defaults — `ErrorMul::new`→`ConsistencyFailure` (ban-safe), `ErrorOT::new`→`MalformedMessage` —
-reconciled by `ErrorMul::from_ot` propagating the OT kind 1:1. The two leak-bearing roots: mul `verify_r`
-(`multiplication.rs:694`) and the COTe consistency fold (`extension.rs:370`). A malformed-*dimension*
+(`signing.rs:658–674/866–882`) and bans **only** on `ConsistencyFailure`. Each layer now exposes only
+**explicit** severity constructors — `ErrorOT::{malformed,consistency}` and `ErrorMul::{malformed,consistency}`
+(the defaulting `::new` was removed, issue #48), reconciled by `ErrorMul::from_ot` propagating the OT kind 1:1
+— so a *new* leak-bearing OT error cannot silently default to recoverable. The two leak-bearing roots: mul `verify_r`
+(`multiplication.rs:695`) and the COTe consistency fold (`extension.rs:372`). A malformed-*dimension*
 message is now **recoverable**, not a ban.
 
 ---
@@ -342,17 +351,17 @@ witness commitment nonce** (`Zeroizing`, M2), re_key secret + polynomial (`Zeroi
 
 Ranked by concentration of subtle invariants × attacker reachability:
 
-1. **OTE consistency check + forced-reuse** (`extension.rs:364–373`) — sole gate protecting reused
+1. **OTE consistency check + forced-reuse** (`extension.rs:366–375`) — sole gate protecting reused
    correlations; constant-time compare **and** (after M1) constant-time `field_mul`; the ban it raises is
    now kind-tagged (H1); session-separation rests on unique caller `session_id`.
-2. **Signing u/v/γ consistency + signature assembly** (`signing.rs:846–907,976–1070`) — deferred-inversion
+2. **Signing u/v/γ consistency + signature assembly** (`signing.rs:855–916,985–1079`) — deferred-inversion
    algebra, the two γ relations binding mul outputs to committed points, recovery-id derivation.
 3. **Fast-refresh OT re-randomization** (`refresh.rs:1071–1156`) — in-place bit/seed mutation with
    index-order swap; trusts pre-existing correlations (deferred-detection at next-sign `verify_r`, now tested — M3).
 4. **EncProof OR-composition + endemic base OT** (`proofs.rs:753–959`, `base.rs:114–150`) — bit-privacy,
    FS challenge-sum binding, `h==base_h` pin.
-5. **DKG Lagrange-in-exponent + chain-code XOR** (`dkg.rs:415–457,1100–1135`).
-6. **Public-gadget agreement** (`multiplication.rs:221–230,480–489`) — derived identically both sides,
+5. **DKG Lagrange-in-exponent + chain-code XOR** (`dkg.rs:415–457,1102–1137`).
+6. **Public-gadget agreement** (`multiplication.rs:222–231,481–490`) — derived identically both sides,
    **never asserted equal at runtime** (documented L4; a mismatch fails `verify_r` downstream).
 
 ---
@@ -375,17 +384,17 @@ Ranked by concentration of subtle invariants × attacker reachability:
 
 | Claim | Method | Result |
 |-------|--------|--------|
-| Signing ban sites | `grep Abort::ban signing.rs` | 4 (`:650/858/886/898`) ✓ |
+| Signing ban sites | `grep Abort::ban signing.rs` | 4 (`:659/867/895/907`) ✓ |
 | Signing recoverable | `grep -c Abort::recoverable` | 33 ✓ |
-| Root agreement echo (ToB-H1) | `grep RootAgreementMismatch signing.rs` | phase-1 echo `:358`, phase-2 cross-check `:566–578` before mul ✓ |
-| Protocol-version handshake (ToB-M2) | `grep ProtocolVersionMismatch signing.rs` | phase-1 stamp `:422`, phase-2 check `:545` before any leak-bearing step ✓ |
+| Root agreement echo (ToB-H1) | `grep RootAgreementMismatch signing.rs` | phase-1 echo `:358`, phase-2 cross-check `:601–613` before mul ✓ |
+| Protocol-version handshake (ToB-M2) | `grep ProtocolVersionMismatch signing.rs` | phase-1 stamp `:422`, phase-2 check `:580` before any leak-bearing step ✓ |
 | DKG / refresh bans | `grep -c Abort::ban` | 0 / 0 ✓ |
-| Ban is kind-aware (H1) | read `signing.rs:649–665/857–873` | `match error.kind` ✓ |
-| Error `kind` machinery (H1) | read `ot.rs:17–49`, `multiplication.rs:126–173` | `OtErrorKind`/`MulErrorKind` + `from_ot` 1:1 ✓ |
-| `field_mul` constant-time (M1) | read `extension.rs:928–932` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
+| Ban is kind-aware (H1) | read `signing.rs:658–674/866–882` | `match error.kind` ✓ |
+| Error `kind` machinery (H1) | read `ot.rs:18–51`, `multiplication.rs:126–174` | `OtErrorKind`/`MulErrorKind` + `from_ot` 1:1 ✓ |
+| `field_mul` constant-time (M1) | read `extension.rs:934–938` | `0u64.wrapping_sub(bit)` mask, no data branch ✓ |
 | EncProof nonce zeroized (M2) | `grep Zeroizing proofs.rs` | `:805` (deref `:876`) ✓ |
 | SignSession low-S default (M4) | read `sign_session.rs:74/234` | always `!s.is_high()` ✓ |
-| M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:1010` (after `ZeroDenominator` `:995`) ✓ |
+| M6 x_coord guard | `grep InvalidXCoordinateHex signing.rs` | `:1019` (after `ZeroDenominator` `:1004`) ✓ |
 | L1 ssid length | `grep MalformedSessionId signing.rs` | `:279` (`ID_LEN`=32) ✓ |
 | M3 trivial-share + H1 zeroize | `grep TrivialKeyShare\|self.zeroize` | `:700/1189`, `:736/1226` ✓ |
 | M3 fast-path tested | `grep 'fn test' refresh.rs` | `:1449`, `:1540` ✓ |

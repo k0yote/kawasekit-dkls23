@@ -10,9 +10,10 @@ pub mod extension;
 ///
 /// Only the COTe consistency check over the reused OT correlations is leak-bearing and
 /// must ban the counterparty; dimension/bounds/base-OT-proof errors are recoverable. See
-/// `docs/audit-findings.md` finding H1. NOTE: the default ([`ErrorOT::new`]) is
-/// `MalformedMessage` because OTE errors are overwhelmingly dimensional — any *new*
-/// leak-bearing OT error MUST be constructed with [`ErrorOT::consistency`].
+/// `docs/audit-findings.md` finding H1. NOTE (issue #48): there is deliberately **no**
+/// defaulting constructor — every OT error must name its severity explicitly via
+/// [`ErrorOT::malformed`] (recoverable) or [`ErrorOT::consistency`] (ban), so a *new*
+/// leak-bearing OT error cannot silently default to recoverable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OtErrorKind {
     /// A leak-bearing consistency-check failure. The counterparty MUST be permanently banned.
@@ -29,10 +30,11 @@ pub struct ErrorOT {
 }
 
 impl ErrorOT {
-    /// Creates a malformed-message (recoverable-class) error — the default for OT, whose
-    /// errors are overwhelmingly dimension/bounds/base-OT-proof faults.
+    /// Creates a malformed-message (recoverable-class) error — for OT's overwhelmingly
+    /// dimension/bounds/base-OT-proof faults. Severity is explicit: a leak-bearing OT
+    /// failure must use [`ErrorOT::consistency`] instead (issue #48).
     #[must_use]
-    pub fn new(description: &str) -> ErrorOT {
+    pub fn malformed(description: &str) -> ErrorOT {
         ErrorOT {
             description: String::from(description),
             kind: OtErrorKind::MalformedMessage,

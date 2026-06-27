@@ -784,12 +784,14 @@ pub fn phase4<C: DklsCurve>(
     // ban). The signing path carries the same check (ToB-M2); cross-party *root agreement* is
     // delegated to the signing-side H1 echo (`RootAgreementMismatch`), which prevents any signing
     // under a divergent assembled root, so no extra DKG round is added here.
-    for broadcast in bip_received_phase2.values() {
+    for (sender, broadcast) in bip_received_phase2 {
         if broadcast.protocol_version != crate::PROTOCOL_VERSION {
             return Err(Abort::recoverable(
                 data.party_index,
                 AbortReason::ProtocolVersionMismatch {
-                    counterparty: broadcast.sender_index,
+                    // Issue #48: attribute to the routing identity (the map key this
+                    // broadcast was filed under), not the self-claimed `sender_index`.
+                    counterparty: *sender,
                     expected: crate::PROTOCOL_VERSION,
                     got: broadcast.protocol_version,
                 },
@@ -1406,6 +1408,44 @@ mod tests {
                     && expected == crate::PROTOCOL_VERSION
                     && got == crate::PROTOCOL_VERSION + 1
         ));
+    }
+
+    /// Issue #48: the DKG M2 check must attribute the version mismatch to the routing
+    /// identity (the map key under which the broadcast was filed), not the broadcast's
+    /// self-claimed `sender_index`. A broadcast filed under key party-2 but spoofing
+    /// `sender_index = 3` with a bad version must abort identifying party 2, not 3.
+    #[test]
+    fn test_dkg_phase4_version_mismatch_attributes_to_routing_identity() {
+        let mut data = setup_two_party_dkg_phase4_inputs();
+        let p2 = PartyIndex::new(2).unwrap();
+        {
+            let b = data.bip_broadcast_2to4.get_mut(&p2).unwrap();
+            b.protocol_version = crate::PROTOCOL_VERSION + 1;
+            b.sender_index = PartyIndex::new(3).unwrap(); // spoofed self-claim != map key
+        }
+
+        let result = phase4::<TestCurve>(
+            &data.all_data[0],
+            &data.poly_points[0],
+            &data.proofs_commitments,
+            &data.zero_kept_3to4[0],
+            &data.zero_received_2to4[0],
+            &data.zero_received_3to4[0],
+            &data.mul_kept_3to4[0],
+            &data.mul_received_3to4[0],
+            &data.bip_broadcast_2to4,
+            &data.bip_broadcast_3to4,
+            no_address,
+        );
+        let abort = result.expect_err("a protocol-version mismatch must abort DKG");
+        assert!(
+            matches!(
+                abort.reason,
+                AbortReason::ProtocolVersionMismatch { counterparty, .. } if counterparty == p2
+            ),
+            "expected attribution to the routing identity (map key party 2), got {:?}",
+            abort.reason
+        );
     }
 
     // DISTRIBUTED KEY GENERATION (without initializations)

@@ -537,6 +537,41 @@ impl<C: DklsCurve> Party<C> {
             ));
         }
 
+        // Validate message routing (sender is an expected counterparty, addressed to us,
+        // no duplicates) BEFORE the M2 / H1 identifiability checks below, so those attribute
+        // their abort to a *routing-validated* counterparty rather than a spoofed,
+        // self-claimed sender (issue #48). All non-leak-bearing and recoverable — and still
+        // strictly before the first leak-bearing OT/multiplication step.
+        let mut seen_senders: BTreeSet<PartyIndex> = BTreeSet::new();
+        for message in received {
+            let counterparty = message.parties.sender;
+            if !data.counterparties.contains(&counterparty) {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::UnexpectedSender {
+                        sender: counterparty,
+                    },
+                ));
+            }
+            if message.parties.receiver != self.party_index {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::MisroutedMessage {
+                        expected_receiver: self.party_index,
+                        actual_receiver: message.parties.receiver,
+                    },
+                ));
+            }
+            if !seen_senders.insert(counterparty) {
+                return Err(Abort::recoverable(
+                    self.party_index,
+                    AbortReason::DuplicateSender {
+                        sender: counterparty,
+                    },
+                ));
+            }
+        }
+
         // M2 (ToB TOB-SILA-11a): reject a counterparty on an incompatible protocol version
         // BEFORE any leak-bearing step, with a dedicated identifiable reason — so a
         // cross-version interaction (e.g. one party not yet carrying a security fix) aborts
@@ -579,35 +614,9 @@ impl<C: DklsCurve> Party<C> {
             }
         }
 
-        let mut seen_senders: BTreeSet<PartyIndex> = BTreeSet::new();
         for message in received {
-            // Validate sender identity before processing (defense-in-depth against misrouting).
+            // Routing was validated up front (issue #48): `sender` is a known counterparty.
             let counterparty = message.parties.sender;
-            if !data.counterparties.contains(&counterparty) {
-                return Err(Abort::recoverable(
-                    self.party_index,
-                    AbortReason::UnexpectedSender {
-                        sender: counterparty,
-                    },
-                ));
-            }
-            if message.parties.receiver != self.party_index {
-                return Err(Abort::recoverable(
-                    self.party_index,
-                    AbortReason::MisroutedMessage {
-                        expected_receiver: self.party_index,
-                        actual_receiver: message.parties.receiver,
-                    },
-                ));
-            }
-            if !seen_senders.insert(counterparty) {
-                return Err(Abort::recoverable(
-                    self.party_index,
-                    AbortReason::DuplicateSender {
-                        sender: counterparty,
-                    },
-                ));
-            }
             let current_kept = kept.get(&counterparty).ok_or_else(|| {
                 Abort::recoverable(
                     self.party_index,
@@ -2381,6 +2390,74 @@ mod tests {
                         && got == crate::PROTOCOL_VERSION + 1
             ),
             "expected ProtocolVersionMismatch identifying party 2, got {:?}",
+            abort.reason
+        );
+    }
+
+    /// Issue #48: the M2 (version) and H1 (root-agreement) identifiability checks must
+    /// attribute their abort to a *routing-validated* sender, not a self-claimed one. A
+    /// message with a spoofed (unknown) sender AND a version mismatch must abort
+    /// `UnexpectedSender` (routing is validated first) — not a `ProtocolVersionMismatch`
+    /// misattributed to the spoofed party.
+    #[test]
+    fn test_sign_phase2_validates_sender_before_version_attribution() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+
+        let mut tampered = received_1to2
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        tampered[0].parties.sender = PartyIndex::new(3).unwrap(); // not a counterparty
+        tampered[0].protocol_version = crate::PROTOCOL_VERSION + 1; // would misattribute to 3
+
+        let result = parties[0].sign_phase2(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("a spoofed unknown sender must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(
+            matches!(
+                abort.reason,
+                AbortReason::UnexpectedSender { sender } if sender == PartyIndex::new(3).unwrap()
+            ),
+            "expected UnexpectedSender(3) — routing validated before version attribution — got {:?}",
+            abort.reason
+        );
+    }
+
+    /// Issue #48 (H1 attribution): a spoofed (unknown) sender carrying a divergent
+    /// `root_digest` must abort `UnexpectedSender`, not a `RootAgreementMismatch`
+    /// misattributed to the spoofed party.
+    #[test]
+    fn test_sign_phase2_validates_sender_before_root_attribution() {
+        let (parties, all_data, unique_kept_1to2, kept_1to2, received_1to2) =
+            setup_two_party_signing_phase1();
+
+        let mut tampered = received_1to2
+            .get(&PartyIndex::new(1).unwrap())
+            .unwrap()
+            .clone();
+        tampered[0].parties.sender = PartyIndex::new(3).unwrap(); // not a counterparty
+        tampered[0].root_digest = [0xFF; 32]; // divergent root — would misattribute to 3
+
+        let result = parties[0].sign_phase2(
+            all_data.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            unique_kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            kept_1to2.get(&PartyIndex::new(1).unwrap()).unwrap(),
+            &tampered,
+        );
+        let abort = result.expect_err("a spoofed unknown sender must be rejected");
+        assert_eq!(abort.kind, AbortKind::Recoverable);
+        assert!(
+            matches!(
+                abort.reason,
+                AbortReason::UnexpectedSender { sender } if sender == PartyIndex::new(3).unwrap()
+            ),
+            "expected UnexpectedSender(3) — routing validated before root attribution — got {:?}",
             abort.reason
         );
     }
