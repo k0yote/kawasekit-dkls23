@@ -146,4 +146,20 @@ mod tests {
             "threshold signature must verify under a standard secp256k1 verifier"
         );
     }
+
+    #[test]
+    fn sign_2of2_verifies_under_standard_ecdsa_p256() {
+        let params = Parameters::new(2, 2).unwrap();
+        let parties = run_dkg::<p256::NistP256, _>(&params, &[7u8; 32], &mut NoMeter);
+        let msg = tagged_hash(b"dkls23-bench", &[b"correctness gate p256"]);
+
+        let sig = run_sign::<p256::NistP256, _>(&parties, 2, &[9u8; 32], msg, &mut NoMeter);
+
+        let r_hex = hex::encode(sig.r);
+        let s_hex = hex::encode(sig.s);
+        assert!(
+            verify_ecdsa_signature::<p256::NistP256>(&msg, &parties[0].pk, &r_hex, &s_hex),
+            "threshold signature must verify under a standard secp256r1 verifier"
+        );
+    }
 }

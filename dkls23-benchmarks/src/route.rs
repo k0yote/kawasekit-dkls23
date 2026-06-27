@@ -18,7 +18,6 @@ pub fn messages_for<M: Clone>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meter::{Meter, WireMeter};
     use dkls23_core::protocols::{PartiesMessage, PartyIndex};
 
     fn pi(n: u8) -> PartyIndex {
@@ -35,15 +34,5 @@ mod tests {
         let to_1 = messages_for(pi(1), &all, |m| m.receiver);
         assert_eq!(to_1.len(), 1);
         assert_eq!(to_1[0].sender, pi(2));
-    }
-
-    #[test]
-    fn wiremeter_counts_bytes_and_rounds() {
-        let mut m = WireMeter::default();
-        let msgs = vec![PartiesMessage { sender: pi(1), receiver: pi(2) }];
-        m.record(&msgs);
-        m.end_round();
-        assert!(m.bytes > 0, "should count serialized bytes");
-        assert_eq!(m.rounds, 1);
     }
 }

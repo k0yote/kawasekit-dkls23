@@ -16,10 +16,11 @@ Reproduce with `cargo bench -p dkls23-benchmarks` and `cargo run -p dkls23-bench
 - **Sampling:** criterion, 100 samples per benchmark; the reported figure is the criterion median (point estimate).
 - **Config:** 2-of-2. **In-process, no network** — timings are compute-only. Message bytes /
   rounds are measured separately (serialization is excluded from the timed path).
-- **Message-byte metric:** total `bincode`-serialized size of the point-to-point round
-  messages produced (each produced message counted once); broadcasts/commitments are not
-  included, so this is the dominant-term wire cost, not a full transport accounting.
-  Rounds = communication rounds.
+- **Message-byte metric:** total `bincode`-serialized size of the per-round messages
+  produced, each counted once. For DKG and refresh these are the point-to-point transmits
+  (proof-commitments and the BIP/derivation broadcasts are excluded). For signing, the
+  phase-3 `Broadcast3to4` is the only round-3 message and IS counted. This is a
+  dominant-term wire metric, not a full transport accounting. Rounds = communication rounds.
 - **Implementations:**
   - `kawasekit-dkls23` (this fork) @ `3221a8e`
   - `0xCarbon/DKLs23` @ `a0ac4d0` (`dev`) — **controlled**: identical crate layout and an
