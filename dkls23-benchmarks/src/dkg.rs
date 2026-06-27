@@ -54,7 +54,8 @@ where
     // Phase 2
     let mut proofs_commitments: Vec<ProofCommitment<C>> = Vec::with_capacity(n);
     let mut zero_transmit_2to4: Vec<Vec<TransmitInitZeroSharePhase2to4>> = Vec::with_capacity(n);
-    let mut bip_broadcast_2to4: BTreeMap<PartyIndex, BroadcastDerivationPhase2to4> = BTreeMap::new();
+    let mut bip_broadcast_2to4: BTreeMap<PartyIndex, BroadcastDerivationPhase2to4> =
+        BTreeMap::new();
     for (i, session) in sessions.iter_mut().enumerate() {
         let (proof_commitment, zero_transmit, bip_broadcast) =
             session.phase2(&poly_fragments[i]).unwrap();
@@ -67,7 +68,9 @@ where
     let mut zero_received_2to4: Vec<Vec<TransmitInitZeroSharePhase2to4>> = Vec::with_capacity(n);
     for i in 1..=parameters.share_count {
         let pi = PartyIndex::new(i).unwrap();
-        zero_received_2to4.push(messages_for(pi, &zero_transmit_2to4, |m| m.parties.receiver));
+        zero_received_2to4.push(messages_for(pi, &zero_transmit_2to4, |m| {
+            m.parties.receiver
+        }));
     }
     for v in &zero_transmit_2to4 {
         meter.record(v);
@@ -77,7 +80,8 @@ where
     // Phase 3
     let mut zero_transmit_3to4: Vec<Vec<TransmitInitZeroSharePhase3to4>> = Vec::with_capacity(n);
     let mut mul_transmit_3to4: Vec<Vec<TransmitInitMulPhase3to4<C>>> = Vec::with_capacity(n);
-    let mut bip_broadcast_3to4: BTreeMap<PartyIndex, BroadcastDerivationPhase3to4> = BTreeMap::new();
+    let mut bip_broadcast_3to4: BTreeMap<PartyIndex, BroadcastDerivationPhase3to4> =
+        BTreeMap::new();
     for (i, session) in sessions.iter_mut().enumerate() {
         let (zero_transmit, mul_transmit, bip_broadcast) = session.phase3().unwrap();
         zero_transmit_3to4.push(zero_transmit);
@@ -90,7 +94,9 @@ where
     let mut mul_received_3to4: Vec<Vec<TransmitInitMulPhase3to4<C>>> = Vec::with_capacity(n);
     for i in 1..=parameters.share_count {
         let pi = PartyIndex::new(i).unwrap();
-        zero_received_3to4.push(messages_for(pi, &zero_transmit_3to4, |m| m.parties.receiver));
+        zero_received_3to4.push(messages_for(pi, &zero_transmit_3to4, |m| {
+            m.parties.receiver
+        }));
         mul_received_3to4.push(messages_for(pi, &mul_transmit_3to4, |m| m.parties.receiver));
     }
     for v in &zero_transmit_3to4 {

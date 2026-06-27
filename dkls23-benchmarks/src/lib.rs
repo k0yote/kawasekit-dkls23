@@ -8,8 +8,8 @@ pub mod meter;
 pub mod route;
 
 pub mod dkg;
-pub mod sign;
 pub mod refresh;
+pub mod sign;
 
 pub use dkg::run_dkg;
 pub use refresh::{run_refresh_complete, run_refresh_fast};

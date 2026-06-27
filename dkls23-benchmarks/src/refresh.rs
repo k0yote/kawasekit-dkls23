@@ -57,7 +57,9 @@ where
     let mut zero_received_2to4: Vec<Vec<TransmitInitZeroSharePhase2to4>> = Vec::with_capacity(n);
     for i in 1..=n as u8 {
         let pi = PartyIndex::new(i).unwrap();
-        zero_received_2to4.push(messages_for(pi, &zero_transmit_2to4, |m| m.parties.receiver));
+        zero_received_2to4.push(messages_for(pi, &zero_transmit_2to4, |m| {
+            m.parties.receiver
+        }));
     }
     for v in &zero_transmit_2to4 {
         meter.record(v);
@@ -68,7 +70,8 @@ where
     let mut zero_kept_3to4: Vec<BTreeMap<PartyIndex, KeepInitZeroSharePhase3to4>> =
         Vec::with_capacity(n);
     let mut zero_transmit_3to4: Vec<Vec<TransmitInitZeroSharePhase3to4>> = Vec::with_capacity(n);
-    let mut mul_kept_3to4: Vec<BTreeMap<PartyIndex, KeepInitMulPhase3to4<C>>> = Vec::with_capacity(n);
+    let mut mul_kept_3to4: Vec<BTreeMap<PartyIndex, KeepInitMulPhase3to4<C>>> =
+        Vec::with_capacity(n);
     let mut mul_transmit_3to4: Vec<Vec<TransmitInitMulPhase3to4<C>>> = Vec::with_capacity(n);
     for (i, p) in parties.iter().enumerate() {
         let (zk, zt, mk, mt) = p.refresh_complete_phase3(refresh_sid, &zero_kept_2to3[i]);
@@ -81,7 +84,9 @@ where
     let mut mul_received_3to4: Vec<Vec<TransmitInitMulPhase3to4<C>>> = Vec::with_capacity(n);
     for i in 1..=n as u8 {
         let pi = PartyIndex::new(i).unwrap();
-        zero_received_3to4.push(messages_for(pi, &zero_transmit_3to4, |m| m.parties.receiver));
+        zero_received_3to4.push(messages_for(pi, &zero_transmit_3to4, |m| {
+            m.parties.receiver
+        }));
         mul_received_3to4.push(messages_for(pi, &mul_transmit_3to4, |m| m.parties.receiver));
     }
     for v in &zero_transmit_3to4 {
@@ -206,9 +211,8 @@ mod tests {
     use dkls23_core::protocols::Parameters;
     use dkls23_core::utilities::hashes::tagged_hash;
 
-    fn refresh_preserves_pk_and_signing<C: dkls23_core::curve::DklsCurve>(
-        fast: bool,
-    ) where
+    fn refresh_preserves_pk_and_signing<C: dkls23_core::curve::DklsCurve>(fast: bool)
+    where
         C::Scalar: serde::Serialize,
         C::AffinePoint: serde::Serialize,
     {

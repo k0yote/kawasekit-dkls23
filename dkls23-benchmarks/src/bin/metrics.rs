@@ -29,25 +29,45 @@ where
     // DKG
     let mut m = WireMeter::default();
     let _ = run_dkg::<C, _>(params, &sid, &mut m);
-    rows.push(Row { op: "dkg", curve, bytes: m.bytes, rounds: m.rounds });
+    rows.push(Row {
+        op: "dkg",
+        curve,
+        bytes: m.bytes,
+        rounds: m.rounds,
+    });
 
     // Sign (parties via NoMeter; measure only signing)
     let parties = run_dkg::<C, _>(params, &sid, &mut NoMeter);
     let mut m = WireMeter::default();
     let _ = run_sign::<C, _>(&parties, 2, &sign_id, msg, &mut m);
-    rows.push(Row { op: "sign", curve, bytes: m.bytes, rounds: m.rounds });
+    rows.push(Row {
+        op: "sign",
+        curve,
+        bytes: m.bytes,
+        rounds: m.rounds,
+    });
 
     // Refresh complete
     let mut parties = run_dkg::<C, _>(params, &sid, &mut NoMeter);
     let mut m = WireMeter::default();
     let _ = run_refresh_complete::<C, _>(&mut parties, &rsid, &mut m);
-    rows.push(Row { op: "refresh_complete", curve, bytes: m.bytes, rounds: m.rounds });
+    rows.push(Row {
+        op: "refresh_complete",
+        curve,
+        bytes: m.bytes,
+        rounds: m.rounds,
+    });
 
     // Refresh fast
     let mut parties = run_dkg::<C, _>(params, &sid, &mut NoMeter);
     let mut m = WireMeter::default();
     let _ = run_refresh_fast::<C, _>(&mut parties, &rsid, &mut m);
-    rows.push(Row { op: "refresh_fast", curve, bytes: m.bytes, rounds: m.rounds });
+    rows.push(Row {
+        op: "refresh_fast",
+        curve,
+        bytes: m.bytes,
+        rounds: m.rounds,
+    });
 
     rows
 }

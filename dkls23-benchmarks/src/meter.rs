@@ -58,7 +58,10 @@ mod tests {
     #[test]
     fn wiremeter_counts_bytes_and_rounds() {
         let mut m = WireMeter::default();
-        let msgs = vec![PartiesMessage { sender: pi(1), receiver: pi(2) }];
+        let msgs = vec![PartiesMessage {
+            sender: pi(1),
+            receiver: pi(2),
+        }];
         m.record(&msgs);
         m.end_round();
         assert!(m.bytes > 0, "should count serialized bytes");

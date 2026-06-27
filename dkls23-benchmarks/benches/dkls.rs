@@ -38,7 +38,13 @@ fn bench_sign(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<k256::Secp256k1, _>(&p, &SESSION_ID, &mut NoMeter),
             |parties| {
-                black_box(run_sign::<k256::Secp256k1, _>(&parties, 2, &SIGN_ID, msg, &mut NoMeter))
+                black_box(run_sign::<k256::Secp256k1, _>(
+                    &parties,
+                    2,
+                    &SIGN_ID,
+                    msg,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )
@@ -47,7 +53,13 @@ fn bench_sign(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<p256::NistP256, _>(&p, &SESSION_ID, &mut NoMeter),
             |parties| {
-                black_box(run_sign::<p256::NistP256, _>(&parties, 2, &SIGN_ID, msg, &mut NoMeter))
+                black_box(run_sign::<p256::NistP256, _>(
+                    &parties,
+                    2,
+                    &SIGN_ID,
+                    msg,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )
@@ -62,7 +74,11 @@ fn bench_refresh_complete(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<k256::Secp256k1, _>(&p, &SESSION_ID, &mut NoMeter),
             |mut parties| {
-                black_box(run_refresh_complete::<k256::Secp256k1, _>(&mut parties, &REFRESH_SID, &mut NoMeter))
+                black_box(run_refresh_complete::<k256::Secp256k1, _>(
+                    &mut parties,
+                    &REFRESH_SID,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )
@@ -71,7 +87,11 @@ fn bench_refresh_complete(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<p256::NistP256, _>(&p, &SESSION_ID, &mut NoMeter),
             |mut parties| {
-                black_box(run_refresh_complete::<p256::NistP256, _>(&mut parties, &REFRESH_SID, &mut NoMeter))
+                black_box(run_refresh_complete::<p256::NistP256, _>(
+                    &mut parties,
+                    &REFRESH_SID,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )
@@ -86,7 +106,11 @@ fn bench_refresh_fast(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<k256::Secp256k1, _>(&p, &SESSION_ID, &mut NoMeter),
             |mut parties| {
-                black_box(run_refresh_fast::<k256::Secp256k1, _>(&mut parties, &REFRESH_SID, &mut NoMeter))
+                black_box(run_refresh_fast::<k256::Secp256k1, _>(
+                    &mut parties,
+                    &REFRESH_SID,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )
@@ -95,7 +119,11 @@ fn bench_refresh_fast(c: &mut Criterion) {
         b.iter_batched(
             || run_dkg::<p256::NistP256, _>(&p, &SESSION_ID, &mut NoMeter),
             |mut parties| {
-                black_box(run_refresh_fast::<p256::NistP256, _>(&mut parties, &REFRESH_SID, &mut NoMeter))
+                black_box(run_refresh_fast::<p256::NistP256, _>(
+                    &mut parties,
+                    &REFRESH_SID,
+                    &mut NoMeter,
+                ))
             },
             BatchSize::SmallInput,
         )

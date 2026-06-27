@@ -27,8 +27,14 @@ mod tests {
     #[test]
     fn messages_for_filters_by_receiver() {
         // Two parties each send one message to the other.
-        let p1_out = vec![PartiesMessage { sender: pi(1), receiver: pi(2) }];
-        let p2_out = vec![PartiesMessage { sender: pi(2), receiver: pi(1) }];
+        let p1_out = vec![PartiesMessage {
+            sender: pi(1),
+            receiver: pi(2),
+        }];
+        let p2_out = vec![PartiesMessage {
+            sender: pi(2),
+            receiver: pi(1),
+        }];
         let all = vec![p1_out, p2_out];
 
         let to_1 = messages_for(pi(1), &all, |m| m.receiver);
