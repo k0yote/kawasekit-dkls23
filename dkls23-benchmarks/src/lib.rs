@@ -12,5 +12,5 @@ pub mod sign;
 pub mod refresh;
 
 pub use dkg::run_dkg;
-// pub use refresh::{run_refresh_complete, run_refresh_fast};  // uncomment in Task 5
+pub use refresh::{run_refresh_complete, run_refresh_fast};
 pub use sign::run_sign;           // uncommented in Task 3
