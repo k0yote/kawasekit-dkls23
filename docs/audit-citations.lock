@@ -24,11 +24,11 @@ dkls23-core/src/protocols/dkg.rs:353	// L3 (self-audit): this `.expect` is an RN
 dkls23-core/src/protocols/dkg.rs:415	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
 dkls23-core/src/protocols/dkg.rs:457	} else if pk != current_pk {
 dkls23-core/src/protocols/dkg.rs:568	protocol_version: crate::PROTOCOL_VERSION,
-dkls23-core/src/protocols/dkg.rs:787	for broadcast in bip_received_phase2.values() {
-dkls23-core/src/protocols/dkg.rs:1045	// In DKG this failed run does not produce reusable OT state,
-dkls23-core/src/protocols/dkg.rs:1046	// so we keep abort classification recoverable.
-dkls23-core/src/protocols/dkg.rs:1100	// We check the commitments and create the final chain code.
-dkls23-core/src/protocols/dkg.rs:1135	}
+dkls23-core/src/protocols/dkg.rs:787	for (sender, broadcast) in bip_received_phase2 {
+dkls23-core/src/protocols/dkg.rs:1047	// In DKG this failed run does not produce reusable OT state,
+dkls23-core/src/protocols/dkg.rs:1048	// so we keep abort classification recoverable.
+dkls23-core/src/protocols/dkg.rs:1102	// We check the commitments and create the final chain code.
+dkls23-core/src/protocols/dkg.rs:1137	}
 dkls23-core/src/protocols/re_key.rs:63	let secret_key = Zeroizing::new(*secret_key);
 dkls23-core/src/protocols/re_key.rs:72	let mut polynomial: Zeroizing<Vec<C::Scalar>> =
 dkls23-core/src/protocols/re_key.rs:134	let mut all_mul_receivers: Vec<BTreeMap<PartyIndex, MulReceiver<C>>> =
@@ -56,49 +56,49 @@ dkls23-core/src/protocols/signing.rs:397	return Err(Abort::recoverable(
 dkls23-core/src/protocols/signing.rs:422	protocol_version: crate::PROTOCOL_VERSION,
 dkls23-core/src/protocols/signing.rs:435	let zero_sid = [
 dkls23-core/src/protocols/signing.rs:441	.concat();
-dkls23-core/src/protocols/signing.rs:545	if message.protocol_version != crate::PROTOCOL_VERSION {
-dkls23-core/src/protocols/signing.rs:566	let our_root_digest = root_agreement_digest(
-dkls23-core/src/protocols/signing.rs:573	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:578	));
-dkls23-core/src/protocols/signing.rs:649	return Err(match error.kind {
-dkls23-core/src/protocols/signing.rs:650	MulErrorKind::ConsistencyFailure => Abort::ban(
-dkls23-core/src/protocols/signing.rs:665	});
-dkls23-core/src/protocols/signing.rs:846	})?;
-dkls23-core/src/protocols/signing.rs:857	return Err(match error.kind {
-dkls23-core/src/protocols/signing.rs:858	MulErrorKind::ConsistencyFailure => Abort::ban(
-dkls23-core/src/protocols/signing.rs:873	});
-dkls23-core/src/protocols/signing.rs:886	return Err(Abort::ban(
-dkls23-core/src/protocols/signing.rs:898	return Err(Abort::ban(
-dkls23-core/src/protocols/signing.rs:907	(C::ProjectivePoint::from(expected_public_key) + message.public_share).to_affine();
-dkls23-core/src/protocols/signing.rs:976	pub fn sign_phase4(
-dkls23-core/src/protocols/signing.rs:992	let denominator_inverse = match Option::<C::Scalar>::from(denominator.invert()) {
-dkls23-core/src/protocols/signing.rs:995	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:1007	{
-dkls23-core/src/protocols/signing.rs:1010	return Err(Abort::recoverable(
-dkls23-core/src/protocols/signing.rs:1015	}
-dkls23-core/src/protocols/signing.rs:1017	let mut s = numerator * denominator_inverse;
-dkls23-core/src/protocols/signing.rs:1028	let verification =
-dkls23-core/src/protocols/signing.rs:1068	let rec_id = (is_y_odd as u8) | ((is_x_reduced as u8) << 1);
-dkls23-core/src/protocols/signing.rs:1070	Ok((signature, rec_id))
+dkls23-core/src/protocols/signing.rs:580	if message.protocol_version != crate::PROTOCOL_VERSION {
+dkls23-core/src/protocols/signing.rs:601	let our_root_digest = root_agreement_digest(
+dkls23-core/src/protocols/signing.rs:608	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:613	));
+dkls23-core/src/protocols/signing.rs:658	return Err(match error.kind {
+dkls23-core/src/protocols/signing.rs:659	MulErrorKind::ConsistencyFailure => Abort::ban(
+dkls23-core/src/protocols/signing.rs:674	});
+dkls23-core/src/protocols/signing.rs:855	})?;
+dkls23-core/src/protocols/signing.rs:866	return Err(match error.kind {
+dkls23-core/src/protocols/signing.rs:867	MulErrorKind::ConsistencyFailure => Abort::ban(
+dkls23-core/src/protocols/signing.rs:882	});
+dkls23-core/src/protocols/signing.rs:895	return Err(Abort::ban(
+dkls23-core/src/protocols/signing.rs:907	return Err(Abort::ban(
+dkls23-core/src/protocols/signing.rs:916	(C::ProjectivePoint::from(expected_public_key) + message.public_share).to_affine();
+dkls23-core/src/protocols/signing.rs:985	pub fn sign_phase4(
+dkls23-core/src/protocols/signing.rs:1001	let denominator_inverse = match Option::<C::Scalar>::from(denominator.invert()) {
+dkls23-core/src/protocols/signing.rs:1004	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:1016	{
+dkls23-core/src/protocols/signing.rs:1019	return Err(Abort::recoverable(
+dkls23-core/src/protocols/signing.rs:1024	}
+dkls23-core/src/protocols/signing.rs:1026	let mut s = numerator * denominator_inverse;
+dkls23-core/src/protocols/signing.rs:1037	let verification =
+dkls23-core/src/protocols/signing.rs:1077	let rec_id = (is_y_odd as u8) | ((is_x_reduced as u8) << 1);
+dkls23-core/src/protocols/signing.rs:1079	Ok((signature, rec_id))
 dkls23-core/src/utilities/multiplication.rs:126	pub enum MulErrorKind {
-dkls23-core/src/utilities/multiplication.rs:173	}
-dkls23-core/src/utilities/multiplication.rs:217	// L4 (self-audit): both parties derive `public_gadget` independently from the same
-dkls23-core/src/utilities/multiplication.rs:221	let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
-dkls23-core/src/utilities/multiplication.rs:230	}
-dkls23-core/src/utilities/multiplication.rs:348	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
-dkls23-core/src/utilities/multiplication.rs:359	}
-dkls23-core/src/utilities/multiplication.rs:476	// L4 (self-audit): both parties derive `public_gadget` independently from the same
-dkls23-core/src/utilities/multiplication.rs:480	let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
-dkls23-core/src/utilities/multiplication.rs:489	}
-dkls23-core/src/utilities/multiplication.rs:537	b = C::Scalar::conditional_select(
-dkls23-core/src/utilities/multiplication.rs:575	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
-dkls23-core/src/utilities/multiplication.rs:586	}
-dkls23-core/src/utilities/multiplication.rs:674	let entry = C::Scalar::conditional_select(
-dkls23-core/src/utilities/multiplication.rs:693	if !bool::from(data_received.verify_r.ct_eq(&expected_verify_r)) {
-dkls23-core/src/utilities/multiplication.rs:694	return Err(ErrorMul::new(
-dkls23-core/src/utilities/multiplication.rs:882	assert_eq!(sum, sender_input[i as usize] * receiver_random);
-dkls23-core/src/utilities/ot.rs:17	pub enum OtErrorKind {
-dkls23-core/src/utilities/ot.rs:49	}
+dkls23-core/src/utilities/multiplication.rs:174	}
+dkls23-core/src/utilities/multiplication.rs:218	// L4 (self-audit): both parties derive `public_gadget` independently from the same
+dkls23-core/src/utilities/multiplication.rs:222	let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
+dkls23-core/src/utilities/multiplication.rs:231	}
+dkls23-core/src/utilities/multiplication.rs:349	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
+dkls23-core/src/utilities/multiplication.rs:360	}
+dkls23-core/src/utilities/multiplication.rs:477	// L4 (self-audit): both parties derive `public_gadget` independently from the same
+dkls23-core/src/utilities/multiplication.rs:481	let mut public_gadget: Vec<C::Scalar> = Vec::with_capacity(BATCH_SIZE as usize);
+dkls23-core/src/utilities/multiplication.rs:490	}
+dkls23-core/src/utilities/multiplication.rs:538	b = C::Scalar::conditional_select(
+dkls23-core/src/utilities/multiplication.rs:576	let mut chi_tilde: Vec<C::Scalar> = Vec::with_capacity(L as usize);
+dkls23-core/src/utilities/multiplication.rs:587	}
+dkls23-core/src/utilities/multiplication.rs:675	let entry = C::Scalar::conditional_select(
+dkls23-core/src/utilities/multiplication.rs:694	if !bool::from(data_received.verify_r.ct_eq(&expected_verify_r)) {
+dkls23-core/src/utilities/multiplication.rs:695	return Err(ErrorMul::consistency(
+dkls23-core/src/utilities/multiplication.rs:883	assert_eq!(sum, sender_input[i as usize] * receiver_random);
+dkls23-core/src/utilities/ot.rs:18	pub enum OtErrorKind {
+dkls23-core/src/utilities/ot.rs:51	}
 dkls23-core/src/utilities/ot/base.rs:80	let mut s = <C::Scalar as Field>::ZERO;
 dkls23-core/src/utilities/ot/base.rs:83	}
 dkls23-core/src/utilities/ot/base.rs:85	// L3 (self-audit): RNG-sanity fail-stop, not attacker-reachable (see `dkg::step3`). The
@@ -107,22 +107,22 @@ dkls23-core/src/utilities/ot/base.rs:150	let m0 = tagged_hash(TAG_OT_BASE_MSG, &
 dkls23-core/src/utilities/ot/base.rs:267	///
 dkls23-core/src/utilities/ot/base.rs:284	
 dkls23-core/src/utilities/ot/base.rs:301	let value_for_mb = (*z * r).to_affine();
-dkls23-core/src/utilities/ot/extension.rs:269	&[session_id, &i_bytes, &count_bytes, &self.seeds[i as usize]],
-dkls23-core/src/utilities/ot/extension.rs:316	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi1", &msg])[0..(OT_SECURITY / 8) as usize],
-dkls23-core/src/utilities/ot/extension.rs:319	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi2", &msg])[0..(OT_SECURITY / 8) as usize],
-dkls23-core/src/utilities/ot/extension.rs:364	let consistent = verify_q
-dkls23-core/src/utilities/ot/extension.rs:367	.fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
-dkls23-core/src/utilities/ot/extension.rs:370	return Err(ErrorOT::consistency(
-dkls23-core/src/utilities/ot/extension.rs:373	}
-dkls23-core/src/utilities/ot/extension.rs:426	TAG_OTE_RANDOMIZE,
-dkls23-core/src/utilities/ot/extension.rs:434	v1.push(tagged_hash_as_scalar::<C>(
-dkls23-core/src/utilities/ot/extension.rs:813	let t_b_j = C::Scalar::conditional_select(
-dkls23-core/src/utilities/ot/extension.rs:843	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
-dkls23-core/src/utilities/ot/extension.rs:899	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
-dkls23-core/src/utilities/ot/extension.rs:928	let bit = (a[j as usize] >> k) & 1;
-dkls23-core/src/utilities/ot/extension.rs:932	}
-dkls23-core/src/utilities/ot/extension.rs:985	}
-dkls23-core/src/utilities/ot/extension.rs:1076	#[test]
+dkls23-core/src/utilities/ot/extension.rs:271	&[session_id, &i_bytes, &count_bytes, &self.seeds[i as usize]],
+dkls23-core/src/utilities/ot/extension.rs:318	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi1", &msg])[0..(OT_SECURITY / 8) as usize],
+dkls23-core/src/utilities/ot/extension.rs:321	&tagged_hash(TAG_OTE_CHI, &[session_id, b"chi2", &msg])[0..(OT_SECURITY / 8) as usize],
+dkls23-core/src/utilities/ot/extension.rs:366	let consistent = verify_q
+dkls23-core/src/utilities/ot/extension.rs:369	.fold(subtle::Choice::from(1u8), |acc, (a, b)| acc & a.ct_eq(b));
+dkls23-core/src/utilities/ot/extension.rs:372	return Err(ErrorOT::consistency(
+dkls23-core/src/utilities/ot/extension.rs:375	}
+dkls23-core/src/utilities/ot/extension.rs:428	TAG_OTE_RANDOMIZE,
+dkls23-core/src/utilities/ot/extension.rs:436	v1.push(tagged_hash_as_scalar::<C>(
+dkls23-core/src/utilities/ot/extension.rs:819	let t_b_j = C::Scalar::conditional_select(
+dkls23-core/src/utilities/ot/extension.rs:849	/// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
+dkls23-core/src/utilities/ot/extension.rs:905	pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
+dkls23-core/src/utilities/ot/extension.rs:934	let bit = (a[j as usize] >> k) & 1;
+dkls23-core/src/utilities/ot/extension.rs:938	}
+dkls23-core/src/utilities/ot/extension.rs:991	}
+dkls23-core/src/utilities/ot/extension.rs:1082	#[test]
 dkls23-core/src/utilities/proofs.rs:233	let mut states: Zeroizing<Vec<C::Scalar>> = Zeroizing::new(Vec::with_capacity(R as usize));
 dkls23-core/src/utilities/proofs.rs:374	pub fn verify(proof: &DLogProof<C>, session_id: &[u8]) -> bool {
 dkls23-core/src/utilities/proofs.rs:387	let identity = <C::AffinePoint as PrimeCurveAffine>::identity();
