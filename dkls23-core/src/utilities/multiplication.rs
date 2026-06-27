@@ -138,10 +138,11 @@ pub struct ErrorMul {
 }
 
 impl ErrorMul {
-    /// Creates a consistency-failure (ban-class) error. This is the conservative default,
-    /// so an unclassified error still bans rather than silently downgrading to recoverable.
+    /// Creates a consistency-failure (ban-class) error — the explicit ban constructor for a
+    /// leak-bearing multiplication / `verify_r` failure. There is deliberately no defaulting
+    /// `new` (issue #48); use [`ErrorMul::malformed`] for a recoverable dimensional fault.
     #[must_use]
-    pub fn new(description: &str) -> ErrorMul {
+    pub fn consistency(description: &str) -> ErrorMul {
         ErrorMul {
             description: String::from(description),
             kind: MulErrorKind::ConsistencyFailure,
@@ -691,7 +692,7 @@ impl<C: DklsCurve> MulReceiver<C> {
         // Constant-time comparison to prevent timing side-channels that
         // could help an adversary forge valid consistency-check values.
         if !bool::from(data_received.verify_r.ct_eq(&expected_verify_r)) {
-            return Err(ErrorMul::new(
+            return Err(ErrorMul::consistency(
                 "Sender cheated in multiplication protocol: Consistency check failed!",
             ));
         }

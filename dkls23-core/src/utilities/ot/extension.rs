@@ -229,22 +229,22 @@ impl OTESender {
     ) -> Result<(Vec<Vec<C::Scalar>>, Vec<Vec<C::Scalar>>), ErrorOT> {
         // The protocol will be executed ot_width times using different input correlations.
         if input_correlations.len() != ot_width as usize {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "The vector of input correlations does not have the expected size!",
             ));
         }
         for correlation in input_correlations {
             if correlation.len() != BATCH_SIZE as usize {
-                return Err(ErrorOT::new(
+                return Err(ErrorOT::malformed(
                     "A correlation vector has incorrect inner length",
                 ));
             }
         }
         if self.correlation.len() != KAPPA as usize || self.seeds.len() != KAPPA as usize {
-            return Err(ErrorOT::new("OTE sender state has incorrect dimensions"));
+            return Err(ErrorOT::malformed("OTE sender state has incorrect dimensions"));
         }
         if data.u.len() != KAPPA as usize || data.verify_t.len() != KAPPA as usize {
-            return Err(ErrorOT::new("OTE data has incorrect dimensions"));
+            return Err(ErrorOT::malformed("OTE data has incorrect dimensions"));
         }
 
         // EXTEND
@@ -545,10 +545,10 @@ impl OTEReceiver {
         choice_bits: &[bool],
     ) -> Result<(Vec<PRGOutput>, OTEDataToSender), ErrorOT> {
         if choice_bits.len() != BATCH_SIZE as usize {
-            return Err(ErrorOT::new("Choice bits vector has incorrect length"));
+            return Err(ErrorOT::malformed("Choice bits vector has incorrect length"));
         }
         if self.seeds0.len() != KAPPA as usize || self.seeds1.len() != KAPPA as usize {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "OTE receiver seed vectors have incorrect dimensions",
             ));
         }
@@ -738,21 +738,21 @@ impl OTEReceiver {
         // our final result will be ot_width times the usual result we would get.
         // But first, we check that the sender gave us a message with the correct length.
         if choice_bits.len() != BATCH_SIZE as usize {
-            return Err(ErrorOT::new("Choice bits vector has incorrect length"));
+            return Err(ErrorOT::malformed("Choice bits vector has incorrect length"));
         }
         if extended_seeds.len() != KAPPA as usize {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "Extended seed matrix has incorrect dimensions",
             ));
         }
         if vector_of_tau.len() != ot_width as usize {
-            return Err(ErrorOT::new(
+            return Err(ErrorOT::malformed(
                 "The vector sent by the sender does not have the expected size!",
             ));
         }
         for tau in vector_of_tau {
             if tau.len() != BATCH_SIZE as usize {
-                return Err(ErrorOT::new("Tau vector has incorrect inner length"));
+                return Err(ErrorOT::malformed("Tau vector has incorrect inner length"));
             }
         }
 
@@ -843,7 +843,7 @@ impl OTEReceiver {
 /// <https://github.com/coinbase/kryptology/blob/master/pkg/ot/extension/kos/kos.go>.
 pub fn cut_and_transpose(input: &[PRGOutput]) -> Result<Vec<HashOutput>, ErrorOT> {
     if input.len() != KAPPA as usize {
-        return Err(ErrorOT::new(
+        return Err(ErrorOT::malformed(
             "Transpose input matrix has incorrect dimensions",
         ));
     }
@@ -902,7 +902,7 @@ pub fn field_mul(left: &[u8], right: &[u8]) -> Result<FieldElement, ErrorOT> {
     const T: u8 = 4;
 
     if (left.len() != (OT_SECURITY / 8) as usize) || (right.len() != (OT_SECURITY / 8) as usize) {
-        return Err(ErrorOT::new(
+        return Err(ErrorOT::malformed(
             "Binary field multiplication: entries don't have the correct length",
         ));
     }
