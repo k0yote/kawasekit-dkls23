@@ -16,12 +16,12 @@ this fork by an exact git SHA, not on the crates.io release.
 | Base version | `dkls23-core` / `dkls23-secp256k1` **v0.5.1** (the crates.io release line) |
 | Base commit | `c9c407e` — "Merge pull request #90 from 0xCarbon/dev" (2026-04-09) |
 | Fork branch | `dev` |
-| Fork HEAD (pinned by the backend) | `4ec716bc479b351e5822d7f21f0e6d0d86d96173` |
+| Fork HEAD (pinned by the backend) | `d308b2563a5034969c549172c24c8448dd1020fc` |
 
 The backend pins this exact SHA in **two** places — they MUST match, otherwise two copies of
 `dkls23-secp256k1` (crates.io vs git) would make the `Abort` types incompatible:
 
-- `kawasekit-mpc-2p/crypto-core/Cargo.toml` → `dkls23-secp256k1 = { git = "…/kawasekit-dkls23.git", rev = "4ec716bc…" }`
+- `kawasekit-mpc-2p/crypto-core/Cargo.toml` → `dkls23-secp256k1 = { git = "…/kawasekit-dkls23.git", rev = "d308b256…" }`
 - `kawasekit-mpc-2p/Cargo.toml` (dev-dep) → same git + rev.
 
 > The 0.5.1 line the fork is cut from already carries upstream's own `rand 0.10.1` maintenance bump
@@ -140,6 +140,21 @@ transport-layer classes (TOB-SILA-6/9/14) are carried to the backend `kawasekit-
 stamped into `BroadcastDerivationPhase2to4` and checked in `dkg::phase4` so a cross-version *keygen* aborts
 early (`ProtocolVersionMismatch`). Cross-party root agreement (H1) stays **delegated to the signing-side
 echo** (no DKG round added — see the H1/M2 notes in `docs/audit-tob-methodology-review.md`).
+
+**Follow-up (post-benchmark adversarial review, issue #48 / PR #49):** after adding the in-repo benchmark
+crate (PR #47), a deep adversarial re-review of the leak-bearing paths confirmed the hardening is
+value-preserving (no regression — const-time selects value-identical, H1 echo cannot false-abort, leak-bearing
+failures still ban) and surfaced two **Low / defense-in-depth** items, both shipped in PR #49:
+- **Sender-validated abort attribution** — `sign_phase2`'s M2 / H1 checks (and `dkg::phase4`'s M2) now
+  attribute their *recoverable* abort to a routing-validated counterparty (routing validation moved ahead of
+  the checks; DKG uses the routing map key) rather than a self-claimed sender. Still strictly before any
+  leak-bearing step.
+- **Explicit error-severity constructors** — the silent `ErrorOT::new` / `ErrorMul::new` were removed in
+  favour of explicit `malformed` / `consistency`, so a *future* leak-bearing OT error cannot silently default
+  to recoverable. Behaviour-preserving (same `kind`s).
+
+Cryptographic *binding* of a message to its sender stays the transport layer's job (TOB-SILA-6/9/14, backend
+`kawasekit-mpc-2p`). The fork delta — and thus the audit scope — now runs through `d308b25`.
 
 ## Frozen release-candidate crypto versions
 
