@@ -1,8 +1,4 @@
 <div align="center">
-  <picture>
-    <source srcset=".assets/dkls23-banner.png" media="(prefers-color-scheme: dark)">
-    <img src=".assets/dkls23-banner.png" alt="DKLs23">
-  </picture>
   <p>
     <a href="https://github.com/k0yote/kawasekit-dkls23/actions/workflows/coverage-lint.yml">
       <img src="https://github.com/k0yote/kawasekit-dkls23/actions/workflows/coverage-lint.yml/badge.svg?branch=dev" alt="CI status">
