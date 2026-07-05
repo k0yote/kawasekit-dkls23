@@ -6,6 +6,9 @@ license = "Apache-2.0 OR MIT"
 description = "DKLs23 Threshold ECDSA — secp256k1 / Ethereum"
 repository = "https://github.com/k0yote/kawasekit-dkls23"
 readme = "README.md"
+# Deliberately un-publishable: this fork keeps the upstream crate names and is consumed only
+# by pinned git rev (README "How it's consumed").
+publish = false
 
 [dependencies]
 dkls23-core = { version = "0.5", path = "../dkls23-core" }

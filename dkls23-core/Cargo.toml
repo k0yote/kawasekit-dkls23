@@ -6,6 +6,9 @@ license = "Apache-2.0 OR MIT"
 description = "DKLs23 Threshold ECDSA — curve-generic core"
 repository = "https://github.com/k0yote/kawasekit-dkls23"
 readme = "README.md"
+# Deliberately un-publishable: this fork keeps the upstream crate names and is consumed only
+# by pinned git rev (README "How it's consumed").
+publish = false
 
 [dependencies]
 elliptic-curve = { version = "0.14.0-rc.4", features = ["arithmetic", "sec1"] }
