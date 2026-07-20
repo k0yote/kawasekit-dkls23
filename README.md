@@ -28,13 +28,14 @@ defensive hardening. Pinned base, per-finding delta, and rebase process are in [
 
 A public, interactive showcase built on this fork runs at
 **<https://kawasekit-rwa-demo.k0yote.dev>** — a 2-of-2 DKLs23 wallet whose key share is born in
-your browser (in-browser DKG), co-signing the cash leg of an RWA-style payment behind a policy
-gate (per-sign and cumulative caps, recipient allowlist, session expiry, kill switch), settled
-as a gasless EIP-3009 transfer on the Polygon Amoy **testnet**.
+your browser (in-browser DKG), co-signing both legs of an RWA-style payment behind a policy
+gate (per-sign and cumulative caps, recipient allowlist, session expiry, kill switch): gasless
+EIP-3009 stablecoin transfers, plus buy/redeem of a reserve-verified tokenized stock, on the
+Ethereum Sepolia **testnet**.
 
-Same ceiling as everything here: **UNAUDITED, testnet only, no real value** — a mock token, no
-issuer affiliation, and a third-party cryptographic audit still standing between this code and
-real value.
+Same ceiling as everything here: **UNAUDITED, testnet only, no real value** — real-testnet
+USDC/JPYC alongside labeled mocks, no issuer affiliation, and a third-party cryptographic audit
+still standing between this code and real value.
 
 ## How it's consumed
 
